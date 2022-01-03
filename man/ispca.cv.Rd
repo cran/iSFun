@@ -5,7 +5,8 @@
 \title{Cross-validation for ispca}
 \usage{
 ispca.cv(x, L, K = 5, mu1, mu2, eps = 1e-04, pen1 = "homogeneity",
-  pen2 = "magnitude", scale.x = TRUE, maxstep = 50)
+  pen2 = "magnitude", scale.x = TRUE, maxstep = 50,
+  submaxstep = 10)
 }
 \arguments{
 \item{x}{list of data matrices, L datasets of explanatory variables.}
@@ -27,9 +28,11 @@ ispca.cv(x, L, K = 5, mu1, mu2, eps = 1e-04, pen1 = "homogeneity",
 \item{scale.x}{character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.}
 
 \item{maxstep}{numeric, maximum iteration steps. The default value is 50.}
+
+\item{submaxstep}{numeric, maximum iteration steps in the sub-iterations. The default value is 10.}
 }
 \value{
-An 'isca.cv' object that contains the list of the following items.
+An 'ispca.cv' object that contains the list of the following items.
 \itemize{
 \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 \item{y:}{ list of data matrices, L datasets of dependent variables with centered columns. If scale.y is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
@@ -57,19 +60,19 @@ L <- length(x)
 mu1 <- c(0.3, 0.5)
 mu2 <- 0.002
 
-res_homo_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-                       pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50)
+res_homo_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "homogeneity",
+                       pen2 = "magnitude", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 
-res_homo_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-                       pen1 = "homogeneity", pen2 = "sign", scale.x = TRUE, maxstep = 50)
+res_homo_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "homogeneity",
+                       pen2 = "sign", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 
-mu1 <- c(0.1, 0.2)
+mu1 <- c(0.1, 0.15)
 mu2 <- 0.05
-res_hete_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-                       pen1 = "heterogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50)
+res_hete_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "heterogeneity",
+                       pen2 = "magnitude", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 
-res_hete_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-                       pen1 = "heterogeneity", pen2 = "sign", scale.x = TRUE, maxstep = 50)
+res_hete_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "heterogeneity",
+                       pen2 = "sign", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 }
 }
 \references{

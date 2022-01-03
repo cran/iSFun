@@ -64,5 +64,5 @@ res <- meta.scca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, trace = TRUE)
 }
 }
 \seealso{
-See Also as \code{\link{iscca}}.
+See Also as \code{\link{iscca}}, \code{\link{scca}}.
 }

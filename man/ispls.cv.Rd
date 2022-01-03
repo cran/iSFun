@@ -6,7 +6,7 @@
 \usage{
 ispls.cv(x, y, L, K, mu1, mu2, eps = 1e-04, kappa = 0.05,
   pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE,
-  scale.y = TRUE, maxstep = 50)
+  scale.y = TRUE, maxstep = 50, submaxstep = 10)
 }
 \arguments{
 \item{x}{list of data matrices, L datasets of explanatory variables.}
@@ -34,6 +34,8 @@ ispls.cv(x, y, L, K, mu1, mu2, eps = 1e-04, kappa = 0.05,
 \item{scale.y}{character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.}
 
 \item{maxstep}{numeric, maximum iteration steps. The default value is 50.}
+
+\item{submaxstep}{numeric, maximum iteration steps in the sub-iterations. The default value is 10.}
 }
 \value{
 An 'ispls.cv' object that contains the list of the following items.
@@ -68,19 +70,19 @@ mu2 <- 0.25
 
 res_homo_m <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
                        kappa = 0.05, pen1 = "homogeneity", pen2 = "magnitude",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 
 res_homo_s <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
                        kappa = 0.05, pen1 = "homogeneity", pen2 = "sign",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 
 res_hete_m <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
                        kappa = 0.05, pen1 = "heterogeneity", pen2 = "magnitude",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 
 res_hete_s <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
                        kappa = 0.05, pen1 = "heterogeneity", pen2 = "sign",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 }
 }
 \references{

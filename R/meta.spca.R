@@ -24,7 +24,7 @@
 ##' \itemize{
 ##' \item{Kim S H, Kang D, Huo Z, et al. Meta-analytic principal component analysis in integrative omics application[J]. Bioinformatics, 2018, 34(8): 1321-1328.}
 ##' }
-##' @seealso See Also as \code{\link{ispca}}.
+##' @seealso See Also as \code{\link{ispca}}, \code{\link{spca}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -90,8 +90,9 @@ meta.spca <- function(x, L, mu1, eps = 1e-4, scale.x = TRUE, maxstep = 50, trace
   iter <- 1
 
   if (trace) {
-    cat("The variables that join the set of selected variables at final step:\n")
+    cat("The variables that join the set of selected variables at each step:\n")
   }
+
   while (dis.u > eps & iter <= maxstep ) {
     # optimize u(l) for fixed v(l)
     u.old <- u
@@ -122,34 +123,39 @@ meta.spca <- function(x, L, mu1, eps = 1e-4, scale.x = TRUE, maxstep = 50, trace
     what_dir <- what_cut / what_cut_norm
     what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
-    iter <- iter + 1
     if ( sum(abs(u) <= 1e-4 ) == p ) {
       cat("The value of mu1 is too large");
       break}
+
+    if (trace) {
+      new2A <- ip[what_cut != 0]
+      cat("\n")
+      cat(paste("--------------------", "\n"))
+      cat(paste("----- Step", iter, " -----\n", sep = " "))
+      cat(paste("--------------------", "\n"))
+      new2A_l <- new2A
+      if (length(new2A_l) <= 10) {
+        cat(paste("X", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("X", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("X", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+    }
+    iter <- iter + 1
   }
 
   # normalization
   what <- what_cut
 
   # selected variables
-  new2A <- which(what != 0)
-  if (trace) {
-    if (length(new2A) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A[(10 * (nlines - 1) + 1):length(new2A)], ", ", sep = " "))
-      cat("\n")
-    }
-  }
+  new2A <- ip[what != 0]
 
   eigenvalue <- mapply(function(l) (t(what)%*%cov(x[[l]]) %*% what), 1:L)
   comp <- lapply(1:L, function(l) x[[l]] %*% what)

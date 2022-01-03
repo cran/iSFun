@@ -5,8 +5,8 @@
 \title{Integrative sparse principal component analysis}
 \usage{
 ispca(x, L, mu1, mu2, eps = 1e-04, pen1 = "homogeneity",
-  pen2 = "magnitude", scale.x = TRUE, maxstep = 50, trace = FALSE,
-  draw = FALSE)
+  pen2 = "magnitude", scale.x = TRUE, maxstep = 50,
+  submaxstep = 10, trace = FALSE, draw = FALSE)
 }
 \arguments{
 \item{x}{list of data matrices, L datasets of explanatory variables.}
@@ -26,6 +26,8 @@ ispca(x, L, mu1, mu2, eps = 1e-04, pen1 = "homogeneity",
 \item{scale.x}{character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.}
 
 \item{maxstep}{numeric, maximum iteration steps. The default value is 50.}
+
+\item{submaxstep}{numeric, maximum iteration steps in the sub-iterations. The default value is 10.}
 
 \item{trace}{character, "TRUE" or "FALSE". If TRUE, prints out its screening results of variables.}
 
@@ -59,15 +61,15 @@ res_homo_m <- ispca(x = x, L = L, mu1 = 0.5, mu2 = 0.002, trace = TRUE, draw = T
 \donttest{
 res_homo_s <- ispca(x = x, L = L, mu1 = 0.5, mu2 = 0.002,
                     pen1 = "homogeneity", pen2 = "sign", scale.x = TRUE,
-                    maxstep = 50, trace = FALSE, draw = FALSE)
+                    maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 
-res_hete_m <- ispca(x = x, L = L, mu1 = 0.2, mu2 = 0.05,
+res_hete_m <- ispca(x = x, L = L, mu1 = 0.1, mu2 = 0.05,
                     pen1 = "heterogeneity", pen2 = "magnitude", scale.x = TRUE,
-                    maxstep = 50, trace = FALSE, draw = FALSE)
+                    maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 
-res_hete_s <- ispca(x = x, L = L, mu1 = 0.2, mu2 = 0.05,
+res_hete_s <- ispca(x = x, L = L, mu1 = 0.1, mu2 = 0.05,
                     pen1 = "heterogeneity", pen2 = "sign", scale.x = TRUE,
-                    maxstep = 50, trace = FALSE, draw = FALSE)
+                    maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 }
 }
 \references{
@@ -76,5 +78,5 @@ res_hete_s <- ispca(x = x, L = L, mu1 = 0.2, mu2 = 0.05,
 }
 }
 \seealso{
-See Also as \code{\link{preview.pca}}, \code{\link{ispls}}, \code{\link{iscca}}.
+See Also as \code{\link{preview.pca}}, \code{\link{ispca.cv}}, \code{\link{meta.spca}}, \code{\link{spca}}.
 }

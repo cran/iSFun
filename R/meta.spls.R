@@ -26,7 +26,7 @@
 ##' \item{normy:}{ list of numeric vectors, column standard deviation of the original datasets y.}
 ##' }
 ##'
-##' @seealso See Also as \code{\link{ispls}}.
+##' @seealso See Also as \code{\link{ispls}}, \code{\link{spls}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -49,7 +49,6 @@ meta.spls <- function(x, y, L, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, sc
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -89,10 +88,6 @@ meta.spls <- function(x, y, L, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, sc
   if (scale.x) { x <- lapply(1:L, function(l) scale(x[[l]], FALSE, normx[[l]]) ) }
   if (scale.y) { y <- lapply(1:L, function(l) scale(y[[l]], FALSE, normy[[l]]) ) }
 
-  if (trace) {
-    cat("The variables that join the set of selected variables at final step:\n")
-  }
-
   ro <- function(x, mu, alpha) {
     f <- function(x) mu * (1 > x / (mu * alpha)) * (1 - x / (mu * alpha))
     r <- integrate(f, 0, x)
@@ -112,20 +107,17 @@ meta.spls <- function(x, y, L, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, sc
   for (l in 1:L) { Z <- Z + ZZ[[l]] }
   Z  <- Z / ( sum(nl) )
 
-  # main iteration: optimize u and v iteratively
-
-  # initial value for u(l) (outside the unit circle)
-
   c <- svd(Z %*% t(Z), nu = 1)$u
   a <- c
-  #u <- U
-  #v <- V
   iter <-1
   dis <- 10
   kappa2 <- (1 - kappa) / (1 - 2 * kappa)
 
+  if (trace) {
+    cat("The variables that join the set of selected variables at each step:\n")
+  }
+
   while (dis > eps & iter <= maxstep) {
-    # optimize u(l) for fixed v(l)
     c.old <- c
     a.old <- a
 
@@ -156,7 +148,6 @@ meta.spls <- function(x, y, L, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, sc
     c_norm <- sqrt(sum(c^2))
     c_norm <- ifelse(c_norm == 0, 0.0001, c_norm)
     c <- c / c_norm
-    #dis <- max(abs(c - c.old))
     dis <- sqrt(sum((c - c.old)^2)) / sqrt(sum(c.old^2))
 
     what <- c
@@ -166,45 +157,46 @@ meta.spls <- function(x, y, L, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, sc
     what_dir <- what_cut / what_cut_norm
     what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
-    iter <- iter + 1
     if ( sum(abs(c) <= 1e-4 ) == p ) {
       cat("The value of mu1 is too large");
-      break} # exists an l such that c(l)=0
+      break}
+
+    if (trace) {
+      new2A <- ip[what_cut != 0]
+      cat("\n")
+      cat(paste("--------------------", "\n"))
+      cat(paste("----- Step", iter, " -----\n", sep = " "))
+      cat(paste("--------------------", "\n"))
+      new2A_l <- new2A
+      if (length(new2A_l) <= 10) {
+        cat(paste("X", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("X", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("X", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+    }
+    iter <- iter + 1
   }
 
   # normalization
-
   what <- what_cut
 
   # selected variables
-
-  new2A <- which(what != 0)
-
-  if (trace) {
-    if (length(new2A) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A[(10 * (nlines - 1) + 1):length(new2A)], ", ", sep = " "))
-      cat("\n")
-    }
-  }
+  new2A <- ip[what != 0]
 
   # fit y with component t=xw
-
   betahat <- matrix(0, nrow = p, ncol = q * L)
 
   fun.fit <- function(l) {
     x_l <- x[[l]]
-    w_l <- what
+    w_l <- as.matrix(what, ncol = 1)
     t_l <- x_l %*% w_l
 
     if (sum(w_l == 0) != p) {

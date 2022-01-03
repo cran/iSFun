@@ -7,7 +7,7 @@
 ##'
 ##' @details See details in \code{\link{ispca}}.
 ##'
-##' @return show the first eigenvector u.
+##' @return the convergence path graph or the scatter diagrams of the first eigenvector u.
 ##'
 ##' @import graphics
 ##' @import stats

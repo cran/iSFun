@@ -15,6 +15,7 @@
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param scale.y character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.
 ##' @param maxstep numeric, maximum iteration steps. The default value is 50.
+##' @param submaxstep numeric, maximum iteration steps in the sub-iterations. The default value is 10.
 ##' @param trace character, "TRUE" or "FALSE". If TRUE, prints out its screening results of variables.
 ##' @param draw character, "TRUE" or "FALSE". If TRUE, plot the convergence path of loadings and the heatmap of coefficient beta.
 ##'
@@ -31,7 +32,7 @@
 ##' \item{meany:}{ list of numeric vectors, column mean of the original datasets y.}
 ##' \item{normy:}{ list of numeric vectors, column standard deviation of the original datasets y.}
 ##' }
-##' @seealso See Also as \code{\link{preview.cca}}, \code{\link{ispls}}, \code{\link{ispca}}.
+##' @seealso See Also as \code{\link{preview.cca}}, \code{\link{iscca.cv}}, \code{\link{meta.scca}}, \code{\link{scca}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -50,32 +51,31 @@
 ##' mu2 <- mu4 <- 2.5
 ##'
 ##' prev_cca <- preview.cca(x = x, y = y, L = L, scale.x = TRUE, scale.y = TRUE)
-##' res_homo_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-##'                     mu4 = mu4, eps = 5e-2, maxstep = 100, trace = TRUE, draw = TRUE)
+##' res_homo_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+##'                     eps = 5e-2, maxstep = 50, submaxstep = 10, trace = TRUE, draw = TRUE)
 ##'
 ##' \donttest{
-##' res_homo_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-##'                     mu4 = mu4, eps = 5e-2, pen1 = "homogeneity", pen2 = "sign",
-##'                     scale.x = TRUE, scale.y = TRUE, maxstep = 100, trace = FALSE, draw = FALSE)
+##' res_homo_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+##'                     eps = 5e-2, pen1 = "homogeneity", pen2 = "sign", scale.x = TRUE,
+##'                     scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##'
 ##' mu1 <- mu3 <- 0.3
 ##' mu2 <- mu4 <- 2
-##' res_hete_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-##'                     mu4 = mu4, eps = 5e-2, pen1 = "heterogeneity", pen2 = "magnitude",
-##'                     scale.x = TRUE, scale.y = TRUE, maxstep = 100, trace = FALSE, draw = FALSE)
+##' res_hete_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+##'                     eps = 5e-2, pen1 = "heterogeneity", pen2 = "magnitude", scale.x = TRUE,
+##'                     scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##'
-##' res_hete_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-##'                     mu4 = mu4, eps = 5e-2, pen1 = "heterogeneity", pen2 = "sign",
-##'                     scale.x = TRUE, scale.y = TRUE, maxstep = 100, trace = FALSE, draw = FALSE)
+##' res_hete_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+##'                     eps = 5e-2, pen1 = "heterogeneity", pen2 = "sign", scale.x = TRUE,
+##'                     scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##' }
 
-iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE, draw = FALSE) {
+iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE) {
 
   if (class(x) != "list") { stop("x should be of list type.") }
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -128,7 +128,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
   }
 
   u_value_homo <- function(u, v, p, q, L, mu1, mu2, pen2) {
-    # compute s[j,l]
     fun.s <- function(j, l) {
       s1 <- t(v[, l]) %*% t(y[[l]]) %*% t(matrix(x[[l]][, j], nrow = 1)) / (nl[l])
       if (pen2 == "magnitude") s2 <- mu2 * sum(u[j, -l])
@@ -144,14 +143,11 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute ro'(||c_j||,mu1,a)
-
     norm_u_j <- apply(u, 1, function(x) {
       return(sqrt(sum(x^2)))
     })
     ro_d <- ro_d1st(norm_u_j, mu1, 6)
 
-    # compute c[j,l]
     fun.c <- function(j, l) {
       s_norm <- sqrt(sum(s[j, ]^2))
       if (pen2 == "magnitude") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( ( mu2 * (L - 1) ) * s_norm )
@@ -165,7 +161,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
   }
 
   u_value_hetero <- function(u, v, p, q, L, mu1, mu2, pen2) {
-    # compute mu[j,l]
     fun.mu <- function(j, l) {
       u_j <- u[j, ]
       ro_j <- mapply(ro, abs(u_j), mu1, 6)
@@ -175,8 +170,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
     }
     result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
     mu <- matrix(result.mu, nrow = p, ncol = L)
-
-    # compute s[j,l]
 
     fun.s <- function(j, l) {
       s1 <- t(v[, l]) %*% t(y[[l]]) %*% t(matrix(x[[l]][, j], nrow = 1)) / (nl[l])
@@ -193,8 +186,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute c[j,l]
-
     fun.c <- function(j, l) {
       if (pen2 == "magnitude") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( mu2 * (L - 1) )
 
@@ -207,7 +198,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
   }
 
   v_value_homo <- function(u, v, p, q, L, mu1, mu2, pen2) {
-    # compute s[j,l]
     fun.s <- function(j, l) {
       s1 <- t(u[, l]) %*% t(x[[l]]) %*% t(matrix(y[[l]][, j], nrow = 1)) / (nl[l])
       if (pen2 == "magnitude") s2 <- mu2 * sum(v[j, -l])
@@ -223,14 +213,11 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
     result.s <- mapply(fun.s, rep(c(1:q), times = L), rep(c(1:L), each = q))
     s <- matrix(result.s, nrow = q, ncol = L)
 
-    # compute ro'(||c_j||,mu1,a)
-
     norm_v_j <- apply(v, 1, function(x) {
       return(sqrt(sum(x^2)))
     })
     ro_d <- ro_d1st(norm_v_j, mu1, 6)
 
-    # compute c[j,l]
     fun.c <- function(j, l) {
       s_norm <- sqrt(sum(s[j, ]^2))
       if (pen2 == "magnitude") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( ( mu2 * (L - 1) ) * s_norm )
@@ -244,7 +231,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
   }
 
   v_value_hetero <- function(u, v, p, q, L, mu1, mu2, pen2) {
-    # compute mu[j,l]
     fun.mu <- function(j, l) {
       v_j <- v[j, ]
       ro_j <- mapply(ro, abs(v_j), mu1, 6)
@@ -254,8 +240,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
     }
     result.mu <- mapply(fun.mu, rep(c(1:q), times = L), rep(c(1:L), each = q))
     mu <- matrix(result.mu, nrow = q, ncol = L)
-
-    # compute s[j,l]
 
     fun.s <- function(j, l) {
       s1 <- t(u[, l]) %*% t(x[[l]]) %*% t(matrix(y[[l]][, j], nrow = 1)) / (nl[l])
@@ -271,8 +255,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
     }
     result.s <- mapply(fun.s, rep(c(1:q), times = L), rep(c(1:L), each = q))
     s <- matrix(result.s, nrow = q, ncol = L)
-
-    # compute c[j,l]
 
     fun.c <- function(j, l) {
       if (pen2 == "magnitude") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( mu2 * (L - 1) )
@@ -301,40 +283,85 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
   }
   V <- mapply(fun.2, 1:L)
 
-  sgn <- mapply(function(l) sign((U[,1]%*%U[,l])/(sqrt(sum(U[,1]^2))*sqrt(sum(U[,l]^2)))), 2:L )
+  sgn1 <- mapply(function(l) sign(U[, l]%*% t(x[[l]]) %*% y[[l]] %*% V[, l]), 1:L )
+  for (l in 1:L) { V[, l] <- sgn1[l]*V[, l] }
+
+  sgn2 <- mapply(function(l) sign((U[,1]%*%U[,l])/(sqrt(sum(U[,1]^2))*sqrt(sum(U[,l]^2)))), 2:L )
   for (l in 2:L) {
-    U[, l] <- sgn[l-1]*U[, l]
-    V[, l] <- sgn[l-1]*V[, l]
+    U[, l] <- sgn2[l-1]*U[, l]
+    V[, l] <- sgn2[l-1]*V[, l]
   }
 
   u <- U
   v <- V
   iter <- 1
-  dis.u <- 10
+  dis.u.iter <- 10
+  dis.v.iter <- 10
   loading_trace_u <- matrix(0, nrow = p * L, ncol = maxstep)
   loading_trace_v <- matrix(0, nrow = q * L, ncol = maxstep)
 
-  # main iteration: optimize u and v iteratively
   if (trace) {
     cat("The variables that join the set of selected variables at each step:\n")
   }
-  while (dis.u > eps & iter <= maxstep) {
-    u.old <- u
 
-    if (pen1 == "homogeneity") u <- u_value_homo(u, v, p, q, L, mu1, mu2, pen2)
-    if (pen1 == "heterogeneity") u <- u_value_hetero(u, v, p, q, L, mu1, mu2, pen2)
-    u_norm <- sqrt(colSums(u^2))
-    u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
-    u <- t(t(u) / u_norm)
-    dis.u <- max( sqrt(colSums((u - u.old)^2)) / sqrt(colSums(u.old^2)) )
+  while (dis.u.iter > eps & dis.v.iter > eps & iter <= maxstep){
+    u.iter <- u
+    v.iter <- v
+    subiter_u <- 1
+    dis.u <- 10
+    while (dis.u > eps & subiter_u <= submaxstep) {
+      u.old <- u
+      if (pen1 == "homogeneity") u <- u_value_homo(u, v, p, q, L, mu1, mu2, pen2)
+      if (pen1 == "heterogeneity") u <- u_value_hetero(u, v, p, q, L, mu1, mu2, pen2)
+      u_norm <- sqrt(colSums(u^2))
+      u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
+      u <- t(t(u) / u_norm)
+      dis.u <- max( sqrt(colSums((u - u.old)^2)) / sqrt(colSums(u.old^2)) )
 
-    what <- u
-    what_cut <- ifelse(abs(what) > 1e-4, what, 0)
-    what_cut_norm <- sqrt(colSums(what_cut^2))
-    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-    what_dir <- t(t(what_cut) / what_cut_norm)
-    what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
+      what <- u
+      what_cut <- ifelse(abs(what) > 1e-4, what, 0)
+      what_cut_norm <- sqrt(colSums(what_cut^2))
+      what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+      what_dir <- t(t(what_cut) / what_cut_norm)
+      what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
+
+      if (sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
+        cat("Stop! The value of mu1 is too large");
+        break}
+      subiter_u <- subiter_u + 1
+    }
+
     loading_trace_u[, iter] <- as.numeric(what_cut)
+
+    subiter_v <- 1
+    dis.v <- 10
+    while (dis.v > eps & subiter_v <= submaxstep) {
+      v.old <- v
+
+      if (pen1 == "homogeneity") v <- v_value_homo(u, v, p, q, L, mu1 = mu3, mu2 = mu4, pen2)
+      if (pen1 == "heterogeneity") v <- v_value_hetero(u, v, p, q, L, mu1 = mu3, mu2 = mu4, pen2)
+      v_norm <- sqrt(colSums(v^2))
+      v_norm <- ifelse(v_norm == 0, 0.0001, v_norm)
+      v <- t(t(v) / v_norm)
+      dis.v <- max( sqrt(colSums((v - v.old)^2)) / sqrt(colSums(v.old^2)) )
+
+      what_v <- v
+      what_cut_v <- ifelse(abs(what_v) > 1e-4, what_v, 0)
+      what_cut_norm <- sqrt(colSums(what_cut_v^2))
+      what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+      what_dir <- t(t(what_cut_v) / what_cut_norm)
+      what_cut_v <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
+
+      if (sum(apply(v, 2, function(x) sum(abs(x) <= 1e-4) == q)) > 0) {
+        cat("Stop! The value of mu1 is too large");
+        break}
+      subiter_v <- subiter_v + 1
+    }
+    loading_trace_v[, iter] <- as.numeric(what_cut_v)
+
+    dis.u.iter <- max( sqrt(colSums((u - u.iter)^2)) / sqrt(colSums(u.iter^2)) )
+    dis.v.iter <- max( sqrt(colSums((v - v.iter)^2)) / sqrt(colSums(v.iter^2)) )
+    if (sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 | sum(apply(v, 2, function(x) sum(abs(x) <= 1e-4) == q)) > 0) { break }
 
     if (trace) {
       # selected variables of x
@@ -366,42 +393,7 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
           cat("\n")
         }
       }
-    }
 
-    if (sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
-      cat("The value of mu1 is too large");
-      break}
-
-    iter <- iter + 1
-  }
-
-  if(iter > 1){
-    loading_trace_u <- loading_trace_u[,1:(iter-1)]
-  }
-
-  u <- U
-  v <- V
-  iter <- 1
-  dis.v <- 10
-  while (dis.v > eps & iter <= maxstep) {
-    v.old <- v
-
-    if (pen1 == "homogeneity") v <- v_value_homo(u, v, p, q, L, mu1 = mu3, mu2 = mu4, pen2)
-    if (pen1 == "heterogeneity") v <- v_value_hetero(u, v, p, q, L, mu1 = mu3, mu2 = mu4, pen2)
-    v_norm <- sqrt(colSums(v^2))
-    v_norm <- ifelse(v_norm == 0, 0.0001, v_norm)
-    v <- t(t(v) / v_norm)
-    dis.v <- max( sqrt(colSums((v - v.old)^2)) / sqrt(colSums(v.old^2)) )
-
-    what_v <- v
-    what_cut_v <- ifelse(abs(what_v) > 1e-4, what_v, 0)
-    what_cut_norm <- sqrt(colSums(what_cut_v^2))
-    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-    what_dir <- t(t(what_cut_v) / what_cut_norm)
-    what_cut_v <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
-    loading_trace_v[, iter] <- as.numeric(what_cut_v)
-
-    if (trace) {
       # selected variables of y
       new2A_v <- list()
       new2A_v <- mapply(function(l) {
@@ -429,24 +421,19 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
         }
       }
     }
-
-    if (sum(apply(v, 2, function(x) sum(abs(x) <= 1e-4) == q)) > 0) {
-      cat("The value of mu1 is too large");
-      break}
     iter <- iter + 1
   }
 
   if(iter > 1){
+    loading_trace_u <- loading_trace_u[,1:(iter-1)]
     loading_trace_v <- loading_trace_v[,1:(iter-1)]
   }
 
   # normalization
-
   what.u <- what_cut
   what.v <- what_cut_v
 
   # selected variables
-
   new2A <- list()
   new2A <- mapply(function(l) {
     A <- ip[what.u[, l] != 0]
@@ -460,7 +447,6 @@ iscca <- function(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-4, pen1 = "homogeneity",
   }, c(1:L), SIMPLIFY = FALSE)
 
   # print out variables that join the active set
-
   plot_draw <- function(draw){
     opar <- par(mfrow = c(1,2))
     on.exit(par(opar))

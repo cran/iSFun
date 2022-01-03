@@ -46,11 +46,11 @@ This function provides penalty-based sparse partial least squares analysis for s
 \examples{
 library(iSFun)
 data("simData.pls")
-x <- simData.pls$x[[1]]
-y <- simData.pls$y[[1]]
-
-res <- spls(x = x, y = y, mu1 = 0.25, trace = TRUE)
+x.spls <- do.call(rbind, simData.pls$x)
+y.spls <- do.call(rbind, simData.pls$y)
+res_spls <- spls(x = x.spls, y = y.spls, mu1 = 0.05, eps = 1e-3, kappa = 0.05,
+                 scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE)
 }
 \seealso{
-See Also as \code{\link{ispls}}.
+See Also as \code{\link{ispls}}, \code{\link{meta.spls}}.
 }

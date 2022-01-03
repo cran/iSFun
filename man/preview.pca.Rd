@@ -14,7 +14,7 @@ preview.pca(x, L, scale.x = TRUE)
 \item{scale.x}{character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.}
 }
 \value{
-An 'ispca' object that contains the list of the following items.
+An 'preview.pca' object that contains the list of the following items.
 \itemize{
 \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 \item{eigenvalue:}{ the estimated first eigenvalue.}

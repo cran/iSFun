@@ -25,7 +25,7 @@
 ##' \item{meany:}{ column mean of the original dataset y.}
 ##' \item{normy:}{ column standard deviation of the original dataset y.}
 ##' }
-##' @seealso See Also as \code{\link{iscca}}.
+##' @seealso See Also as \code{\link{iscca}}, \code{\link{meta.scca}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -36,17 +36,14 @@
 ##' @examples
 ##' library(iSFun)
 ##' data("simData.cca")
-##' x <- simData.cca$x[[1]]
-##' y <- simData.cca$y[[1]]
-##' mu1 <- 0.25
-##' mu2 <- 0.25
-##'
-##' res <- scca(x = x, y = y, mu1 = mu1, mu2 = mu2, trace = TRUE)
+##' x.scca <- do.call(rbind, simData.cca$x)
+##' y.scca <- do.call(rbind, simData.cca$y)
+##' res_scca <- scca(x = x.scca, y = y.scca, mu1 = 0.1, mu2 = 0.1, eps = 1e-3,
+##'                  scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE)
 
 scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE) {
 
   # initialization
-
   x <- as.matrix(x)
   y <- as.matrix(y)
   nx <- nrow(x)
@@ -56,6 +53,7 @@ scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxs
   if(nx != ny){ stop("The rows of data x and data y should be consistent.")}
   n <- nx
   ip <- c(1:p)
+  iq <- c(1:q)
 
   # center & scale x
   one <- matrix(1, 1, n)
@@ -73,7 +71,6 @@ scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxs
   } else {
     normx <- rep(1, p)
   }
-
 
   if (scale.y) {
     normy <- sqrt(drop(one %*% (y^2)) / (n - 1))
@@ -105,14 +102,18 @@ scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxs
 
   u <- U
   v <- V
-  iter <-1
+  iter <- 1
   dis.u <- 10
-  # main iteration: optimize u and v iteratively
+  dis.v <- 10
+
   if (trace) {
     cat("The variables that join the set of selected variables at final step:\n")
   }
-  while (dis.u > eps & iter <= maxstep) {
+
+  while (dis.u > eps & dis.v > eps & iter <= maxstep){
     u.old <- u
+    v.old <- v
+
     s <- t(v) %*% t(y) %*% x / (n)
     ro_d <- mapply(function(j) ro_d1st(s[j], mu1, 6), 1:p)
     fun.c <- function(j) {
@@ -131,18 +132,7 @@ scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxs
     what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
     what_dir <- what_cut / what_cut_norm
     what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
-    if ( sum(abs(u) <= 1e-4 ) == p ) {
-      cat("The value of mu1 is too large");
-      break}
-    iter <- iter + 1
-  }
 
-  u <- U
-  v <- V
-  iter <-1
-  dis.v <- 10
-  while (dis.v > eps & iter <= maxstep) {
-    v.old <- v
     s <- t(u) %*% t(x) %*% y / (n)
     ro_d <- mapply(function(j) ro_d1st(s[j], mu2, 6), 1:q)
     fun.c <- function(j) {
@@ -161,9 +151,56 @@ scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxs
     what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
     what_dir <- what_cut_v / what_cut_norm
     what_cut_v <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
-    if ( sum(abs(v) <= 1e-4 ) == q ) {
-      cat("The value of mu2 is too large");
-      break}
+
+    dis.u <- sqrt(sum((u - u.old)^2)) / sqrt(sum(u.old^2))
+    dis.v <- sqrt(sum((v - v.old)^2)) / sqrt(sum(v.old^2))
+    if ( sum(abs(v) <= 1e-4 ) == q & sum(abs(u) <= 1e-4 ) == p) {
+      cat("Stop! The values of mu1 and mu2 are too large");
+      break }
+    if ( sum(abs(v) <= 1e-4 ) != q & sum(abs(u) <= 1e-4 ) == p) {
+      cat("Stop! The value of mu1 is too large");
+      break }
+    if ( sum(abs(v) <= 1e-4 ) == q & sum(abs(u) <= 1e-4 ) != p) {
+      cat("Stop! The value of mu2 is too large");
+      break }
+
+    if (trace) {
+      new2A_u <- ip[what_cut != 0]
+      new2A_v <- iq[what_cut_v != 0]
+      cat("\n")
+      cat(paste("--------------------", "\n"))
+      cat(paste("----- Step", iter, " -----\n", sep = " "))
+      cat(paste("--------------------", "\n"))
+      new2A_l <- new2A_u
+      if (length(new2A_l) <= 10) {
+        cat(paste("X", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("X", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("X", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+
+      new2A_l <- new2A_v
+      if (length(new2A_l) <= 10) {
+        cat(paste("Y", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("Y", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("Y", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+    }
     iter <- iter + 1
   }
 
@@ -177,40 +214,6 @@ scca <- function(x, y, mu1, mu2, eps =1e-4, scale.x = TRUE, scale.y = TRUE, maxs
   new2A <- which(what != 0)
   new2A_v <- which(what_v != 0)
 
-  if (trace) {
-    if (length(new2A) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A[(10 * (nlines - 1) + 1):length(new2A)], ", ", sep = " "))
-      cat("\n")
-    }
-
-    if (length(new2A_v) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A_v, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A_v) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A_v[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A_v[(10 * (nlines - 1) + 1):length(new2A_v)], ", ", sep = " "))
-      cat("\n")
-    }
-
-  }
   # return objects
   object <- list(
     x = x, y = y, loading.x = what, loading.y = what_v,

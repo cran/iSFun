@@ -14,6 +14,7 @@
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param scale.y character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.
 ##' @param maxstep numeric, maximum iteration steps. The default value is 50.
+##' @param submaxstep numeric, maximum iteration steps in the sub-iterations. The default value is 10.
 ##' @param trace character, "TRUE" or "FALSE". If TRUE, prints out its screening results of variables.
 ##' @param draw character, "TRUE" or "FALSE". If TRUE, plot the convergence path of loadings.
 ##'
@@ -33,7 +34,7 @@
 ##' \itemize{
 ##' \item{Liang W, Ma S, Zhang Q, et al. Integrative sparse partial least squares[J]. Statistics in Medicine, 2021, 40(9): 2239-2256.}
 ##' }
-##' @seealso See Also as \code{\link{preview.pls}}, \code{\link{ispca}}, \code{\link{iscca}}.
+##' @seealso See Also as \code{\link{preview.pls}}, \code{\link{ispls.cv}}, \code{\link{meta.spls}}, \code{\link{spls}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -57,26 +58,25 @@
 ##' res_homo_s <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
 ##'                     eps = 5e-2, kappa = 0.05, pen1 = "homogeneity",
 ##'                     pen2 = "sign", scale.x = TRUE, scale.y = TRUE,
-##'                     maxstep = 50, trace = FALSE, draw = FALSE)
+##'                     maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##'
 ##' res_hete_m <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
 ##'                     eps = 5e-2, kappa = 0.05, pen1 = "heterogeneity",
 ##'                     pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE,
-##'                     maxstep = 50, trace = FALSE, draw = FALSE)
+##'                     maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##'
 ##' res_hete_s <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
 ##'                     eps = 5e-2, kappa = 0.05, pen1 = "heterogeneity",
 ##'                     pen2 = "sign", scale.x = TRUE, scale.y = TRUE,
-##'                     maxstep = 50, trace = FALSE, draw = FALSE)
+##'                     maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##' }
 
-ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE, draw = FALSE) {
+ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE) {
 
   if (class(x) != "list") { stop("x should be of list type.") }
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -87,7 +87,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
   if(length(p) > 1){ stop("The dimension of data x should be consistent among different datasets.")}
   if(length(q) > 1){ stop("The dimension of data y should be consistent among different datasets.")}
   ip <- c(1:p)
-  #n <- mean(unique(nl))
 
   # center & scale x & y
   meanx <- lapply(1:L, function(l) drop( matrix(1, 1, nl[l]) %*% x[[l]] / nl[l] ) )
@@ -117,26 +116,12 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
   if (scale.x) { x <- lapply(1:L, function(l) scale(x[[l]], FALSE, normx[[l]]) ) }
   if (scale.y) { y <- lapply(1:L, function(l) scale(y[[l]], FALSE, normy[[l]]) ) }
 
-  # initilize objects
-
-  what <- matrix(0, p, L)
-
-  # main iteration
-
-  if (trace) {
-    cat("The variables that join the set of selected variables at each step:\n")
-  }
-
-  # define Z
-
   fun.1 <- function(l) {
     Z_l <- t(x[[l]]) %*% y[[l]]
     Z_l <- Z_l / nl[l]
   }
-  #ZZ <- lapply(1:L, fun.1)
   Z <- matrix(mapply(fun.1, c(1:L)), nrow = p)
 
-  # fit direction vector
   ro <- function(x, mu, alpha) {
     f <- function(x) mu * (1 > x / (mu * alpha)) * (1 - x / (mu * alpha))
     r <- integrate(f, 0, x)
@@ -149,7 +134,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
   }
 
   c_value_homo <- function(Z, a, c,  p, q, L, mu1, mu2, pen2) {
-    # compute s[j,l]
     fun.s <- function(j, l) {
       Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
       a_l <- matrix(a[, l], ncol = 1)
@@ -168,14 +152,11 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute ro'(||c_j||,mu1,a)
-
     norm_c_j <- apply(c, 1, function(x) {
       return(sqrt(sum(x^2)))
     })
     ro_d <- ro_d1st(norm_c_j, mu1, 6)
 
-    # compute c[j,l]
     fun.c <- function(j, l) {
       s_norm <- sqrt(sum(s[j, ]^2))
       if (pen2 == "magnitude") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 / q / (nl[l]^2) + mu2 * (L - 1) ) * s_norm )
@@ -189,7 +170,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
   }
 
   c_value_hetero <- function(Z, a, c, p, q, L, mu1, mu2, pen2) {
-    # compute mu[j,l]
     fun.mu <- function(j, l) {
       c_j <- c[j, ]
       ro_j <- mapply(ro, abs(c_j), mu1, 6)
@@ -199,8 +179,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
     }
     result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
     mu <- matrix(result.mu, nrow = p, ncol = L)
-
-    # compute s[j,l]
 
     fun.s <- function(j, l) {
       Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
@@ -220,7 +198,81 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute c[j,l]
+    fun.c <- function(j, l) {
+      if (pen2 == "magnitude") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 / q / (nl[l]^2) + mu2 * (L - 1) )
+
+      if (pen2 == "sign") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 / q / (nl[l]^2) + mu2 * (L - 1) / (c[j, l]^2 + 0.5) )
+
+      return(c)
+    }
+    c <- matrix(mapply(fun.c, rep(c(1:p), times = L), rep(c(1:L), each = p)), nrow = p, ncol = L)
+    return(c)
+  }
+
+  c_value_homo_q1 <- function(Z, a, c,  p, q, L, mu1, mu2, pen2) {
+    fun.s <- function(j, l) {
+      Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
+      a_l <- matrix(a[, l], ncol = 1)
+      c_j <- c[j, ]
+      s1 <- t(a_l) %*% Z_l %*% t(matrix(Z_l[j], nrow = 1)) / (nl[l]^2)
+      if (pen2 == "magnitude") s2 <- mu2 * sum(c_j[-l])
+      if (pen2 == "sign") {
+        s2 <- mu2 * sum(mapply(function(x) {
+          r <- x / sqrt(x^2 + 0.5)
+          return(r)
+        }, c_j[-l])) / sqrt(c_j[l]^2 + 0.5)
+      }
+      s <- s1 + s2
+      return(s)
+    }
+    result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
+    s <- matrix(result.s, nrow = p, ncol = L)
+
+    norm_c_j <- apply(c, 1, function(x) {
+      return(sqrt(sum(x^2)))
+    })
+    ro_d <- ro_d1st(norm_c_j, mu1, 6)
+
+    fun.c <- function(j, l) {
+      s_norm <- sqrt(sum(s[j, ]^2))
+      if (pen2 == "magnitude") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 / q / (nl[l]^2) + mu2 * (L - 1) ) * s_norm )
+
+      if (pen2 == "sign") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 / q / (nl[l]^2) + mu2 * (L - 1) / (c[j, l]^2 + 0.5) ) * s_norm)
+
+      return(c)
+    }
+    c <- matrix(mapply(fun.c, rep(c(1:p), times = L), rep(c(1:L), each = p)), nrow = p, ncol = L)
+    return(c)
+  }
+
+  c_value_hetero_q1 <- function(Z, a, c, p, q, L, mu1, mu2, pen2) {
+    fun.mu <- function(j, l) {
+      c_j <- c[j, ]
+      ro_j <- mapply(ro, abs(c_j), mu1, 6)
+      s_ro <- sum(as.data.frame(ro_j[1, ]))
+      mu_jl <- ro_d1st(s_ro, 1, 1 / 2 * L * 6 * mu1^2) * ro_d1st(abs(c_j[l]), mu1, 6)
+      return(mu_jl)
+    }
+    result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
+    mu <- matrix(result.mu, nrow = p, ncol = L)
+
+    fun.s <- function(j, l) {
+      Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
+      a_l <- matrix(a[, l], ncol = 1)
+      c_j <- c[j, ]
+      s1 <- t(a_l) %*% Z_l %*% t(matrix(Z_l[j], nrow = 1)) / (nl[l]^2)
+      if (pen2 == "magnitude") s2 <- mu2 * sum(c_j[-l])
+      if (pen2 == "sign") {
+        s2 <- mu2 * sum(mapply(function(x) {
+          r <- x / sqrt(x^2 + 0.5)
+          return(r)
+        }, c_j[-l])) / sqrt(c_j[l]^2 + 0.5)
+      }
+      s <- s1 + s2
+      return(s)
+    }
+    result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
+    s <- matrix(result.s, nrow = p, ncol = L)
 
     fun.c <- function(j, l) {
       if (pen2 == "magnitude") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 / q / (nl[l]^2) + mu2 * (L - 1) )
@@ -233,24 +285,35 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
     return(c)
   }
 
+  # initilize objects
+  what <- matrix(0, p, L)
   fun.2 <- function(l) M_l <- Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)]) / q #/ (nl[l]^2)
   M <- matrix(mapply(fun.2, c(1:L)), nrow = p)
   dis <- 10
   iter <- 1
 
   # main iteration: optimize c and a iteratively
-
   kappa2 <- (1 - kappa) / (1 - 2 * kappa)
 
   # initial value for c(l) (outside the unit circle)
-
   c <- mapply(function(l) svd(Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)] ), nu = 1)$u, 1:L)#/ (nl[l]^2)
+  sgn1 <- mapply(function(l) sign( t(c[, l]) %*% Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)] ) %*% c[, l]), 1:L )
+  for (l in 1:L) { c[, l] <- sgn1[l]*c[, l]}
+  sgn2 <- mapply(function(l) sign((c[, 1] %*% c[,l])/(sqrt(sum(c[, 1]^2))*sqrt(sum(c[, l]^2)))), 2:L )
+  for (l in 2:L) { c[, l] <- sgn2[l-1] * c[, l] }
   a <- c
+  iter <- 1
+  dis.c.iter <- 10
   loading_trace <- matrix(0, nrow = p * L, ncol = maxstep)
 
-  while (dis > eps & iter <= maxstep) {
+  if (trace) {
+    cat("The variables that join the set of selected variables at each step:\n")
+  }
+
+  while (dis.c.iter > eps & iter <= maxstep) {
     # optimize a(l) for fixed c(l)
-    c.old <- c
+    c.iter <- c
+    a.iter <- a
     fun.3 <- function(l) {
       h <- function(lambda) {
         alpha <- solve(M[, ((l - 1) * p + 1):(l * p)] + lambda * diag(p)) %*% M[, ((l - 1) * p + 1):(l * p)] %*% c[, l]
@@ -259,7 +322,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
       }
 
       # control size of M_l & c_l if too small
-
       while (h(1e-4) * h(1e+12) > 0) { # while( h(1e-4) <= 1e+5 )
         {
           M[, ((l - 1) * p + 1):(l * p)] <- 2 * M[, ((l - 1) * p + 1):(l * p)]
@@ -268,7 +330,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
       }
 
       # optimization
-
       lambdas <- uniroot(h, c(1e-4, 1e+12))$root
       a_l <- kappa2 * solve(M[, ((l - 1) * p + 1):(l * p)] + lambdas * diag(p)) %*% M[, ((l - 1) * p + 1):(l * p)] %*% c[, l]
       return(a_l)
@@ -277,25 +338,37 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
     a <- mapply(fun.3, c(1:L))
 
     # optimize c(l) for fixed a(l)
+    subiter_c <- 1
+    dis.c <- 10
+    while (dis.c > eps & subiter_c <= submaxstep) {
+      c.old <- c
+      if (pen1 == "homogeneity" & q != 1) c <- c_value_homo(Z, a, c, p, q, L, mu1, mu2, pen2)
+      if (pen1 == "homogeneity" & q == 1) c <- c_value_homo_q1(Z, a, c, p, q, L, mu1, mu2, pen2)
+      if (pen1 == "heterogeneity" & q != 1) c <- c_value_hetero(Z, a, c, p, q, L, mu1, mu2, pen2)
+      if (pen1 == "heterogeneity" & q == 1) c <- c_value_hetero_q1(Z, a, c, p, q, L, mu1, mu2, pen2)
 
-    if (pen1 == "homogeneity") c <- c_value_homo(Z, a, c, p, q, L, mu1, mu2, pen2)
-    if (pen1 == "heterogeneity") c <- c_value_hetero(Z, a, c, p, q, L, mu1, mu2, pen2)
+      # calculate discrepancy between a & c
+      c_norm <- sqrt(colSums(c^2))
+      c_norm <- ifelse(c_norm == 0, 0.0001, c_norm)
+      c <- t(t(c) / c_norm)
+      dis <- max( sqrt(colSums((c - c.old)^2)) / sqrt(colSums(c.old^2)) )
 
-    # calculate discrepancy between a & c
-    c_norm <- sqrt(colSums(c^2))
-    c_norm <- ifelse(c_norm == 0, 0.0001, c_norm)
-    c <- t(t(c) / c_norm)
-    #dis <- max(abs(c - c.old))
-    dis <- max( sqrt(colSums((c - c.old)^2)) / sqrt(colSums(c.old^2)) )
+      what <- c
+      what_cut <- ifelse(abs(what) > 1e-4, what, 0)
+      what_cut_norm <- sqrt(colSums(what_cut^2))
+      what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+      what_dir <- t(t(what_cut) / what_cut_norm)
+      what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
+      loading_trace[, iter] <- as.numeric(what_cut)
 
+      if (sum(apply(c, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
+        cat("Stop! The value of mu1 is too large");
+        break}
+      subiter_c <- subiter_c + 1
+    }
 
-    what <- c
-    what_cut <- ifelse(abs(what) > 1e-4, what, 0)
-    what_cut_norm <- sqrt(colSums(what_cut^2))
-    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-    what_dir <- t(t(what_cut) / what_cut_norm)
-    what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
-    loading_trace[, iter] <- as.numeric(what_cut)
+    dis.c.iter <- max( sqrt(colSums((c - c.iter)^2)) / sqrt(colSums(c.iter^2)) )
+    if (sum(apply(c, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 ) { break }
 
     if (trace) {
       # selected variables
@@ -328,20 +401,14 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
         }
       }
     }
-
     iter <- iter + 1
-    if (sum(apply(c, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
-      cat("The value of mu1 is too large");
-      break} # exists an l such that c(l)=0
   }
   loading_trace <- loading_trace[,1:(iter-1)]
 
   # normalization
-
   what <- what_cut
 
   # selected variables
-
   new2A <- list()
   new2A <- mapply(function(l) {
     A <- ip[what[, l] != 0]
@@ -349,12 +416,11 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
   }, c(1:L), SIMPLIFY = FALSE)
 
   # fit y with component t=xw
-
   betahat <- matrix(0, nrow = p, ncol = q * L)
 
   fun.fit <- function(l) {
     x_l <- x[[l]]
-    w_l <- what[, l]
+    w_l <- as.matrix(what[, l], ncol = 1)
     t_l <- x_l %*% w_l
 
     if (sum(w_l == 0) != p) {
@@ -389,8 +455,6 @@ ispls <- function(x, y, L, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogenei
   rownames(what) <- c(1 : p)
 
   if(draw){
-    rc <- rainbow(nrow(betahat[[1]]), start = 0, end = .3)
-    cc <- rainbow(ncol(betahat[[1]]), start = 0, end = .3)
     for (l in 1:L) {
       matplot(t(loading_trace[((l-1)*p+1):(l*p),]), type = 'l',
               main = paste("Dataset ", l, "\n", "Convergence path of elements in vector w"),

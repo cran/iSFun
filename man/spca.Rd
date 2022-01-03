@@ -38,10 +38,10 @@ This function provides penalty-based integrative sparse principal component anal
 \examples{
 library(iSFun)
 data("simData.pca")
-x <- simData.pca$x[[1]]
-
-res <- spca(x = x, mu1 = 0.08, trace = TRUE)
+x.spca <- do.call(rbind, simData.pca$x)
+res_spca <- spca(x = x.spca, mu1 = 0.08, eps = 1e-3, scale.x = TRUE,
+                 maxstep = 50, trace = FALSE)
 }
 \seealso{
-See Also as \code{\link{ispca}}.
+See Also as \code{\link{ispca}}, \code{\link{meta.spca}}.
 }

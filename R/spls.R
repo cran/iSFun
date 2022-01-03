@@ -24,7 +24,7 @@
 ##' \item{meany:}{ column mean of the original dataset y.}
 ##' \item{normy:}{ column standard deviation of the original dataset y.}
 ##' }
-##' @seealso See Also as \code{\link{ispls}}.
+##' @seealso See Also as \code{\link{ispls}}, \code{\link{meta.spls}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -35,15 +35,14 @@
 ##' @examples
 ##' library(iSFun)
 ##' data("simData.pls")
-##' x <- simData.pls$x[[1]]
-##' y <- simData.pls$y[[1]]
-##'
-##' res <- spls(x = x, y = y, mu1 = 0.25, trace = TRUE)
+##' x.spls <- do.call(rbind, simData.pls$x)
+##' y.spls <- do.call(rbind, simData.pls$y)
+##' res_spls <- spls(x = x.spls, y = y.spls, mu1 = 0.05, eps = 1e-3, kappa = 0.05,
+##'                  scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE)
 
 spls <- function(x, y, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE) {
 
   # initialization
-
   x <- as.matrix(x)
   y <- as.matrix(y)
   nx <- nrow(x)
@@ -83,20 +82,15 @@ spls <- function(x, y, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, scale.y = 
   }
 
   # initilize objects
-
   what <- matrix(0, p, 1)
 
-  # main iteration
-
   if (trace) {
-    cat("The variables that join the set of selected variables at final step:\n")
+    cat("The variables that join the set of selected variables at each step:\n")
   }
 
-  # define Z
   Z <- t(x) %*% y
   Z <- Z / (n)
 
-  # fit direction vector
   ro <- function(x, mu, alpha) {
     f <- function(x) mu * (1 > x / (mu * alpha)) * (1 - x / (mu * alpha))
     r <- integrate(f, 0, x)
@@ -108,21 +102,14 @@ spls <- function(x, y, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, scale.y = 
     return(r)
   }
 
-  # main iteration: optimize u and v iteratively
-
-  # initial value for u(l) (outside the unit circle)
-
   c <- svd(Z %*% t(Z) , nu = 1)$u
   a <- c
-  #u <- U
-  #v <- V
   iter <-1
   dis <- 10
   kappa2 <- (1 - kappa) / (1 - 2 * kappa)
   loading_trace <- matrix(0, nrow = p, ncol = maxstep)
 
   while (dis > eps & iter <= maxstep) {
-    # optimize u(l) for fixed v(l)
     c.old <- c
     a.old <- a
 
@@ -153,7 +140,6 @@ spls <- function(x, y, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, scale.y = 
     c_norm <- sqrt(sum(c^2))
     c_norm <- ifelse(c_norm == 0, 0.0001, c_norm)
     c <- c / c_norm
-    #dis <- max(abs(c - c.old))
     dis <- sqrt(sum((c - c.old)^2)) / sqrt(sum(c.old^2))
 
     what <- c
@@ -164,40 +150,39 @@ spls <- function(x, y, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, scale.y = 
     what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
     loading_trace[, iter] <- as.numeric(what_cut)
 
-    iter <- iter + 1
     if ( sum(abs(c) <= 1e-4 ) == p ) {
       cat("The value of mu1 is too large");
-      break} # exists an l such that c(l)=0
+      break}
+    if (trace) {
+      new2A <- ip[what_cut != 0]
+      cat("\n")
+      cat(paste("--------------------", "\n"))
+      cat(paste("----- Step", iter, " -----\n", sep = " "))
+      cat(paste("--------------------", "\n"))
+      new2A_l <- new2A
+      if (length(new2A_l) <= 10) {
+        cat(paste("X", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("X", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("X", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+    }
+    iter <- iter + 1
   }
   loading_trace <- loading_trace[,1:(iter-1)]
 
   # normalization
-
   what <- what_cut
 
   # selected variables
-
-  new2A <- which(what != 0)
-
-  if (trace) {
-    if (length(new2A) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A[(10 * (nlines - 1) + 1):length(new2A)], ", ", sep = " "))
-      cat("\n")
-    }
-  }
-
-  # print out variables that join the active set
+  new2A <- ip[what != 0]
 
   betahat <- matrix(0, nrow = p, ncol = q)
   w <- what
@@ -215,7 +200,6 @@ spls <- function(x, y, mu1, eps = 1e-4, kappa = 0.05, scale.x = TRUE, scale.y = 
   if (q > 1 & !is.null(colnames(y))) {
     colnames(betahat) <- c(1 : q)
   }
-
 
   # return objects
   object <- list(

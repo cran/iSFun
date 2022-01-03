@@ -47,13 +47,11 @@ This function provides penalty-based sparse canonical correlation analysis to ge
 \examples{
 library(iSFun)
 data("simData.cca")
-x <- simData.cca$x[[1]]
-y <- simData.cca$y[[1]]
-mu1 <- 0.25
-mu2 <- 0.25
-
-res <- scca(x = x, y = y, mu1 = mu1, mu2 = mu2, trace = TRUE)
+x.scca <- do.call(rbind, simData.cca$x)
+y.scca <- do.call(rbind, simData.cca$y)
+res_scca <- scca(x = x.scca, y = y.scca, mu1 = 0.1, mu2 = 0.1, eps = 1e-3,
+                 scale.x = TRUE, scale.y = TRUE, maxstep = 50, trace = FALSE)
 }
 \seealso{
-See Also as \code{\link{iscca}}.
+See Also as \code{\link{iscca}}, \code{\link{meta.scca}}.
 }

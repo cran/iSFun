@@ -6,7 +6,7 @@
 \usage{
 iscca.cv(x, y, L, K = 5, mu1, mu2, mu3, mu4, eps = 1e-04,
   pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE,
-  scale.y = TRUE, maxstep = 50)
+  scale.y = TRUE, maxstep = 50, submaxstep = 10)
 }
 \arguments{
 \item{x}{list of data matrices, L datasets of explanatory variables.}
@@ -36,6 +36,8 @@ iscca.cv(x, y, L, K = 5, mu1, mu2, mu3, mu4, eps = 1e-04,
 \item{scale.y}{character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.}
 
 \item{maxstep}{numeric, maximum iteration steps. The default value is 50.}
+
+\item{submaxstep}{numeric, maximum iteration steps in the sub-iterations. The default value is 10.}
 }
 \value{
 An 'iscca.cv' object that contains the list of the following items.
@@ -74,21 +76,21 @@ mu2 <- mu4 <- 2.5
 
 res_homo_m <- iscca.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, mu3 = mu3,
                        mu4 = mu4, eps = 1e-2, pen1 = "homogeneity", pen2 = "magnitude",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 100)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 
 res_homo_s <- iscca.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, mu3 = mu3,
                        mu4 = mu4, eps = 1e-2, pen1 = "homogeneity", pen2 = "sign",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 100)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 
 mu1 <- mu3 <- c(0.1, 0.3)
 mu2 <- mu4 <- 2
 res_hete_m <- iscca.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, mu3 = mu3,
                        mu4 = mu4, eps = 1e-2, pen1 = "heterogeneity", pen2 = "magnitude",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 100)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 
 res_hete_s <- iscca.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, mu3 = mu3,
                        mu4 = mu4, eps = 1e-2, pen1 = "heterogeneity", pen2 = "sign",
-                       scale.x = TRUE, scale.y = TRUE, maxstep = 100)
+                       scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 }
 }
 \seealso{

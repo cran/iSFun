@@ -18,13 +18,11 @@ preview.pls(x, y, L, scale.x = TRUE, scale.y = TRUE)
 \item{scale.y}{character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.}
 }
 \value{
-A 'meta.spls' object that contains the list of the following items.
+A 'preview.pls' object that contains the list of the following items.
 \itemize{
 \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 \item{y:}{ list of data matrices, L datasets of dependent variables with centered columns. If scale.y is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
-\item{betahat:}{ the estimated regression coefficients.}
 \item{loading:}{ the estimated first direction vector.}
-\item{variable:}{ the screening results of variables x.}
 \item{meanx:}{ list of numeric vectors, column mean of the original datasets x.}
 \item{normx:}{ list of numeric vectors, column standard deviation of the original datasets x.}
 \item{meany:}{ list of numeric vectors, column mean of the original datasets y.}
@@ -32,7 +30,7 @@ A 'meta.spls' object that contains the list of the following items.
 }
 }
 \description{
-The function describes the basic statistical information of the data, including sample mean, sample co-variance of X and Y, the first direction of partial least squares method, estimation coefficient, etc.
+The function describes the basic statistical information of the data, including sample mean, sample variance of X and Y, the first direction of partial least squares method, etc.
 }
 \examples{
 library(iSFun)

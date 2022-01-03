@@ -6,7 +6,7 @@
 ##' @param L numeric, number of data sets.
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##'
-##' @return An 'ispca' object that contains the list of the following items.
+##' @return An 'preview.pca' object that contains the list of the following items.
 ##' \itemize{
 ##' \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 ##' \item{eigenvalue:}{ the estimated first eigenvalue.}
@@ -38,7 +38,6 @@ preview.pca <- function(x, L, scale.x = TRUE) {
   if (class(x) != "list") { stop("x should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
   pl <- as.numeric(lapply(x, ncol))
@@ -63,10 +62,8 @@ preview.pca <- function(x, L, scale.x = TRUE) {
   if (scale.x) { x <- lapply(1:L, function(l) scale(x[[l]], FALSE, normx[[l]]) ) }
 
   # initilize objects
-
   what <- matrix(0, p, L)
 
-  # define Z
   fun.1 <- function(l) {
     Z_l <- irlba(x[[l]], nu = 1, nv = 1)
     u_l <- Z_l$v

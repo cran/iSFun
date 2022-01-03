@@ -12,8 +12,9 @@
 ##' @param pen2 character, "magnitude" or "sign" based contrasted penalty. If not specified, the default is magnitude.
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param maxstep numeric, maximum iteration steps. The default value is 50.
+##' @param submaxstep numeric, maximum iteration steps in the sub-iterations. The default value is 10.
 ##'
-##' @return An 'isca.cv' object that contains the list of the following items.
+##' @return An 'ispca.cv' object that contains the list of the following items.
 ##' \itemize{
 ##' \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 ##' \item{y:}{ list of data matrices, L datasets of dependent variables with centered columns. If scale.y is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
@@ -48,27 +49,26 @@
 ##' mu1 <- c(0.3, 0.5)
 ##' mu2 <- 0.002
 ##'
-##' res_homo_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-##'                        pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50)
+##' res_homo_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "homogeneity",
+##'                        pen2 = "magnitude", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 ##'
-##' res_homo_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-##'                        pen1 = "homogeneity", pen2 = "sign", scale.x = TRUE, maxstep = 50)
+##' res_homo_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "homogeneity",
+##'                        pen2 = "sign", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 ##'
-##' mu1 <- c(0.1, 0.2)
+##' mu1 <- c(0.1, 0.15)
 ##' mu2 <- 0.05
-##' res_hete_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-##'                        pen1 = "heterogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50)
+##' res_hete_m <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "heterogeneity",
+##'                        pen2 = "magnitude", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 ##'
-##' res_hete_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2,
-##'                        pen1 = "heterogeneity", pen2 = "sign", scale.x = TRUE, maxstep = 50)
+##' res_hete_s <- ispca.cv(x = x, L = L, K = 5, mu1 = mu1, mu2 = mu2, pen1 = "heterogeneity",
+##'                        pen2 = "sign", scale.x = TRUE, maxstep = 50, submaxstep = 10)
 ##' }
 
-ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50) {
+ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50, submaxstep = 10) {
 
   if (class(x) != "list") { stop("x should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
   pl <- as.numeric(lapply(x, ncol))
@@ -93,11 +93,8 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
   if (scale.x) { normx <- lapply(1:L, x.scale ) } else { normx <- rep(list(rep(1,p)), L) }
   if (scale.x) { x <- lapply(1:L, function(l) scale(x[[l]], FALSE, normx[[l]]) ) }
 
-  # initilize objects
-
   folds <- lapply(1:L, function(l) createFolds(1:nl[l], K))
 
-  # fit direction vector
   ro <- function(x, mu, alpha) {
     f <- function(x) mu * (1 > x / (mu * alpha)) * (1 - x / (mu * alpha))
     r <- integrate(f, 0, x)
@@ -110,9 +107,8 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
   }
 
   u_value_homo <- function(u, v, p, L, mu1, mu2, pen2, x, nl) {
-    # compute s[j,l]
     fun.s <- function(j, l) {
-      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol = p, nrow = nl[[l]]) ) / nl[l]
+      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol = p, nrow = nl[l]) ) / nl[l]
       if (pen2 == "magnitude") s2 <- mu2 * sum(u[j, -l])
       if (pen2 == "sign") {
         s2 <- mu2 * sum(mapply(function(x) {
@@ -126,14 +122,11 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute ro'(||c_j||,mu1,a)
-
     norm_u_j <- apply(u, 1, function(x) {
       return(sqrt(sum(x^2)))
     })
     ro_d <- ro_d1st(norm_u_j, mu1, 6)
 
-    # compute c[j,l]
     fun.c <- function(j, l) {
       s_norm <- sqrt(sum(s[j, ]^2))
       if (pen2 == "magnitude") c <- nl[l] * (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 + mu2 * nl[l] * (L - 1) ) * s_norm )
@@ -147,7 +140,6 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
   }
 
   u_value_hetero <- function(u, v, p, L, mu1, mu2, pen2, x, nl) {
-    # compute mu[j,l]
     fun.mu <- function(j, l) {
       u_j <- u[j, ]
       ro_j <- mapply(ro, abs(u_j), mu1, 6)
@@ -158,10 +150,8 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
     result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
     mu <- matrix(result.mu, nrow = p, ncol = L)
 
-    # compute s[j,l]
-
     fun.s <- function(j, l) {
-      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol = p, nrow = nl[[l]]) ) / nl[l]
+      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol = p, nrow = nl[l]) ) / nl[l]
       if (pen2 == "magnitude") s2 <- mu2 * sum(u[j, -l])
       if (pen2 == "sign") {
         s2 <- mu2 * sum(mapply(function(x) {
@@ -174,8 +164,6 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
     }
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
-
-    # compute c[j,l]
 
     fun.c <- function(j, l) {
       if (pen2 == "magnitude") c <- nl[l] * sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 + mu2 *nl[l] * (L - 1) )
@@ -190,9 +178,7 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
 
   fun.k <- function(k){
     x.train <- lapply(1:L, function(l) x[[l]][-folds[[l]][[k]],])
-    #y.train <- lapply(1:L, function(l) y[[l]][-folds[[l]][[k]],])
     x.test  <- lapply(1:L, function(l) x[[l]][folds[[l]][[k]],])
-    #y.test  <- lapply(1:L, function(l) y[[l]][folds[[l]][[k]],])
     nl.train <- as.numeric(lapply(x.train, nrow))
     nl.test <- as.numeric(lapply(x.test, nrow))
     return(list(x.train = x.train, x.test = x.test, nl.train = nl.train, nl.test = nl.test))
@@ -212,12 +198,14 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
       return(u_l)
     }
     U <- matrix(mapply(fun.1, 1:L), nrow = p)
+
     fun.2 <- function(l) {
       Z_l <- irlba(x.train[[l]], nu =1, nv = 1)
       v_l <- Z_l$u
       return(v_l)
     }
     V <- lapply(1:L, fun.2)
+
     sgn <- mapply(function(l) sign((U[,1]%*%U[,l])/(sqrt(sum(U[,1]^2))*sqrt(sum(U[,l]^2)))), 2:L )
     for (l in 2:L) {
       U[, l] <- sgn[l-1]*U[, l]
@@ -226,35 +214,44 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
 
     u <- U
     v <- V
-    iter <-1
-    dis.u <- 10
-    while (dis.u > eps & iter <= maxstep) {
-      u.old <- u
-      v.old <- v
-      if (pen1 == "homogeneity") u <- u_value_homo(u, v, p, L, mu1, mu2, pen2, x = x.train, nl = nl.train)
-      if (pen1 == "heterogeneity") u <- u_value_hetero(u, v, p, L, mu1, mu2, pen2, x = x.train, nl = nl.train)
+    iter <- 1
+    dis.u.iter <- 10
+    while (dis.u.iter > eps & iter <= maxstep) {
+      u.iter <- u
+      subiter_u <- 1
+      dis.u <- 10
+      while (dis.u > eps & subiter_u <= submaxstep) {
+        u.old <- u
+        if (pen1 == "homogeneity") u <- u_value_homo(u, v, p, L, mu1, mu2, pen2, x = x.train, nl = nl.train)
+        if (pen1 == "heterogeneity") u <- u_value_hetero(u, v, p, L, mu1, mu2, pen2, x = x.train, nl = nl.train)
+
+        u_norm <- sqrt(colSums(u^2))
+        u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
+        u.scale <- t(t(u) / u_norm)
+        dis.u <- max( sqrt(colSums((u - u.old)^2)) / sqrt(colSums(u.old^2)) )
+
+        what <- u.scale
+        what_cut <- ifelse(abs(what) > 1e-4, what, 0)
+        what_cut_norm <- sqrt(colSums(what_cut^2))
+        what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+        what_dir <- t(t(what_cut) / what_cut_norm)
+        what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
+        if (sum(apply(u.scale, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
+          cat("The value of mu1 is too large");
+          break}
+        subiter_u <- subiter_u + 1
+      }
+
       if( sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 ){
         cat("The value of mu1 is too large");
         what_cut <- u
         break }
+
       v <- lapply(1:L, function(l) x.train[[l]] %*% u[, l] / sqrt( sum( (x.train[[l]] %*% u[, l])^2 ) ))
 
-      u_norm <- sqrt(colSums(u^2))
-      u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
-      u.scale <- t(t(u) / u_norm)
-      dis.u <- max( sqrt(colSums((u - u.old)^2)) / sqrt(colSums(u.old^2)) )
-
-      what <- u.scale
-      what_cut <- ifelse(abs(what) > 1e-4, what, 0)
-      what_cut_norm <- sqrt(colSums(what_cut^2))
-      what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-      what_dir <- t(t(what_cut) / what_cut_norm)
-      what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
-
+      dis.u.iter <- max( sqrt(colSums((u - u.iter)^2)) / sqrt(colSums(u.iter^2)) )
+      if (sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 ) { break }
       iter <- iter + 1
-      if (sum(apply(u.scale, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
-        cat("The value of mu1 is too large");
-        break}
     }
 
     v.test <- lapply(1:L, function(l) x.test[[l]] %*% what_cut[, l])
@@ -281,7 +278,6 @@ ispca.cv <- function(x, L, K = 5, mu1, mu2, eps = 1e-4, pen1 = "homogeneity", pe
                   scale.x, maxstep, trace = FALSE, draw = FALSE)
 
   # return objects
-  #object <- list( mu1 = mu1.final, mu2 = mu2.final, fold = folds )
   object <- list(
     x = x, mu1 = mu1.final, mu2 = mu2.final, fold = folds,
     eigenvalue = result$eigenvalue, eigenvector = result$eigenvector,

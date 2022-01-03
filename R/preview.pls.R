@@ -1,6 +1,6 @@
 ##' @title Statistical description before using function ispls
 ##'
-##' @description The function describes the basic statistical information of the data, including sample mean, sample co-variance of X and Y, the first direction of partial least squares method, estimation coefficient, etc.
+##' @description The function describes the basic statistical information of the data, including sample mean, sample variance of X and Y, the first direction of partial least squares method, etc.
 ##'
 ##' @param x list of data matrices, L datasets of explanatory variables.
 ##' @param y list of data matrices, L datasets of dependent variables.
@@ -8,13 +8,11 @@
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param scale.y character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.
 ##'
-##' @return A 'meta.spls' object that contains the list of the following items.
+##' @return A 'preview.pls' object that contains the list of the following items.
 ##' \itemize{
 ##' \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 ##' \item{y:}{ list of data matrices, L datasets of dependent variables with centered columns. If scale.y is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
-##' \item{betahat:}{ the estimated regression coefficients.}
 ##' \item{loading:}{ the estimated first direction vector.}
-##' \item{variable:}{ the screening results of variables x.}
 ##' \item{meanx:}{ list of numeric vectors, column mean of the original datasets x.}
 ##' \item{normx:}{ list of numeric vectors, column standard deviation of the original datasets x.}
 ##' \item{meany:}{ list of numeric vectors, column mean of the original datasets y.}
@@ -44,7 +42,6 @@ preview.pls <- function(x, y, L, scale.x = TRUE, scale.y = TRUE){
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -88,49 +85,14 @@ preview.pls <- function(x, y, L, scale.x = TRUE, scale.y = TRUE){
     Z_l <- t(x[[l]]) %*% y[[l]]
     Z_l <- Z_l / nl[l]
   }
-  #ZZ <- lapply(1:L, fun.1)
   Z <- matrix(mapply(fun.1, c(1:L)), nrow = p)
-
-  # main iteration: optimize u and v iteratively
-
-  # initial value for u(l) (outside the unit circle)
 
   c <- mapply(function(l) svd(Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)] ), nu = 1)$u, 1:L)#/ (nl[l]^2)
 
   # normalization
-
   what <- c
 
-  # fit y with component t=xw
-
-  betahat <- matrix(0, nrow = p, ncol = q * L)
-
-  fun.fit <- function(l) {
-    x_l <- x[[l]]
-    w_l <- what[, l]
-    t_l <- x_l %*% w_l
-
-    if (sum(w_l == 0) != p) {
-      y_l <- y[[l]]
-      fit_l <- lm(y_l ~ t_l - 1)
-      betahat_l <- matrix(w_l %*% coef(fit_l), nrow = p, ncol = q)
-    }
-    else {
-      betahat_l <- matrix(0, nrow = p, ncol = q)
-    }
-    if (!is.null(colnames(x[[l]]))) {
-      rownames(betahat_l) <- c(1 : p)
-    }
-    if (q > 1 & !is.null(colnames(y[[l]]))) {
-      colnames(betahat_l) <- c(1 : q)
-    }
-    return(betahat_l)
-  }
-
-  betahat <- lapply(1:L, fun.fit)
-
   listname <- mapply(function(l) paste("Dataset ", l), 1:L)
-  names(betahat) <- listname
   names(meanx) <- listname
   names(meany) <- listname
   names(normx) <- listname
@@ -144,19 +106,9 @@ preview.pls <- function(x, y, L, scale.x = TRUE, scale.y = TRUE){
          xlab = "Dimension", ylab = "Value", pch = 15)
   }
 
-  heat <- lapply(1:L, function(l) Z[, ((l - 1) * q + 1):(l * q)] )#/ (nl[l]^2)
-
-  rc <- rainbow(nrow(heat[[1]]), start = 0, end = .3)
-  cc <- rainbow(ncol(heat[[1]]), start = 0, end = .3)
-  for (l in 1:L) {
-    heatmap(x = t(heat[[l]]), RowSideColors = cc, ColSideColors = rc,
-            Rowv = NA, Colv = NA, scale = "row", xlab = paste("Dataset ", l, ": X"), ylab = "Y",
-            main = paste("Heatmap of co-variance (X vs. Y)"))
-  }
-
   # return objects
   object <- list(
-    x = x, y = y, betahat = betahat, loading = what,
+    x = x, y = y, loading = what,
     meanx = meanx, normx = normx, meany = meany, normy = normy
   )
   class(object) <- "preview.spls"

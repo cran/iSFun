@@ -19,7 +19,7 @@
 ##' \item{meanx:}{ column mean of the original dataset x.}
 ##' \item{normx:}{ column standard deviation of the original dataset x.}
 ##' }
-##' @seealso See Also as \code{\link{ispca}}.
+##' @seealso See Also as \code{\link{ispca}}, \code{\link{meta.spca}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -30,9 +30,9 @@
 ##' @examples
 ##' library(iSFun)
 ##' data("simData.pca")
-##' x <- simData.pca$x[[1]]
-##'
-##' res <- spca(x = x, mu1 = 0.08, trace = TRUE)
+##' x.spca <- do.call(rbind, simData.pca$x)
+##' res_spca <- spca(x = x.spca, mu1 = 0.08, eps = 1e-3, scale.x = TRUE,
+##'                  maxstep = 50, trace = FALSE)
 
 spca <- function(x, mu1, eps =1e-4, scale.x = TRUE, maxstep = 50, trace = FALSE) {
 
@@ -80,10 +80,10 @@ spca <- function(x, mu1, eps =1e-4, scale.x = TRUE, maxstep = 50, trace = FALSE)
   dis.u <- 10
   loading_trace <- matrix(0, nrow = p, ncol = maxstep)
 
-  # main iteration
   if (trace) {
-    cat("The variables that join the set of selected variables at final step:\n")
+    cat("The variables that join the set of selected variables at each step:\n")
   }
+
   while (dis.u > eps & iter <= maxstep) {
     u.old <- u
     v.old <- v
@@ -113,10 +113,32 @@ spca <- function(x, mu1, eps =1e-4, scale.x = TRUE, maxstep = 50, trace = FALSE)
     what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
     loading_trace[, iter] <- as.numeric(what_cut)
 
-    iter <- iter + 1
     if ( sum(abs(u.scale) <= 1e-4 ) == p ) {
       cat("The value of mu1 is too large");
       break}
+
+    if (trace) {
+      new2A <- ip[what_cut != 0]
+      cat("\n")
+      cat(paste("--------------------", "\n"))
+      cat(paste("----- Step", iter, " -----\n", sep = " "))
+      cat(paste("--------------------", "\n"))
+      new2A_l <- new2A
+      if (length(new2A_l) <= 10) {
+        cat(paste("X", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("X", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("X", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+    }
+    iter <- iter + 1
   }
   loading_trace <- loading_trace[,1:(iter-1)]
 
@@ -124,24 +146,7 @@ spca <- function(x, mu1, eps =1e-4, scale.x = TRUE, maxstep = 50, trace = FALSE)
   what <- what_cut
 
   # selected variables
-  new2A <- which(what != 0)
-  if (trace) {
-    if (length(new2A) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A[(10 * (nlines - 1) + 1):length(new2A)], ", ", sep = " "))
-      cat("\n")
-    }
-  }
+  new2A <- ip[what != 0]
 
   eigenvalue <- t(what) %*% cov(x) %*% what
   comp <- x %*% what

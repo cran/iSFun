@@ -51,5 +51,5 @@ res <- meta.spca(x = x, L = L, mu1 = 0.5, trace = TRUE)
 }
 }
 \seealso{
-See Also as \code{\link{ispca}}.
+See Also as \code{\link{ispca}}, \code{\link{spca}}.
 }

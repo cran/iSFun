@@ -6,7 +6,7 @@
 \usage{
 iscca(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-04, pen1 = "homogeneity",
   pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50,
-  trace = FALSE, draw = FALSE)
+  submaxstep = 10, trace = FALSE, draw = FALSE)
 }
 \arguments{
 \item{x}{list of data matrices, L datasets of explanatory variables.}
@@ -34,6 +34,8 @@ iscca(x, y, L, mu1, mu2, mu3, mu4, eps = 1e-04, pen1 = "homogeneity",
 \item{scale.y}{character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.}
 
 \item{maxstep}{numeric, maximum iteration steps. The default value is 50.}
+
+\item{submaxstep}{numeric, maximum iteration steps in the sub-iterations. The default value is 10.}
 
 \item{trace}{character, "TRUE" or "FALSE". If TRUE, prints out its screening results of variables.}
 
@@ -68,25 +70,25 @@ mu1 <- mu3 <- 0.4
 mu2 <- mu4 <- 2.5
 
 prev_cca <- preview.cca(x = x, y = y, L = L, scale.x = TRUE, scale.y = TRUE)
-res_homo_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-                    mu4 = mu4, eps = 5e-2, maxstep = 100, trace = TRUE, draw = TRUE)
+res_homo_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+                    eps = 5e-2, maxstep = 50, submaxstep = 10, trace = TRUE, draw = TRUE)
 
 \donttest{
-res_homo_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-                    mu4 = mu4, eps = 5e-2, pen1 = "homogeneity", pen2 = "sign",
-                    scale.x = TRUE, scale.y = TRUE, maxstep = 100, trace = FALSE, draw = FALSE)
+res_homo_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+                    eps = 5e-2, pen1 = "homogeneity", pen2 = "sign", scale.x = TRUE,
+                    scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 
 mu1 <- mu3 <- 0.3
 mu2 <- mu4 <- 2
-res_hete_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-                    mu4 = mu4, eps = 5e-2, pen1 = "heterogeneity", pen2 = "magnitude",
-                    scale.x = TRUE, scale.y = TRUE, maxstep = 100, trace = FALSE, draw = FALSE)
+res_hete_m <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+                    eps = 5e-2, pen1 = "heterogeneity", pen2 = "magnitude", scale.x = TRUE,
+                    scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 
-res_hete_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3,
-                    mu4 = mu4, eps = 5e-2, pen1 = "heterogeneity", pen2 = "sign",
-                    scale.x = TRUE, scale.y = TRUE, maxstep = 100, trace = FALSE, draw = FALSE)
+res_hete_s <- iscca(x = x, y = y, L = L, mu1 = mu1, mu2 = mu2, mu3 = mu3, mu4 = mu4,
+                    eps = 5e-2, pen1 = "heterogeneity", pen2 = "sign", scale.x = TRUE,
+                    scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 }
 }
 \seealso{
-See Also as \code{\link{preview.cca}}, \code{\link{ispls}}, \code{\link{ispca}}.
+See Also as \code{\link{preview.cca}}, \code{\link{iscca.cv}}, \code{\link{meta.scca}}, \code{\link{scca}}.
 }

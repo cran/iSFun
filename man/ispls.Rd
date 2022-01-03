@@ -6,7 +6,8 @@
 \usage{
 ispls(x, y, L, mu1, mu2, eps = 1e-04, kappa = 0.05,
   pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE,
-  scale.y = TRUE, maxstep = 50, trace = FALSE, draw = FALSE)
+  scale.y = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE,
+  draw = FALSE)
 }
 \arguments{
 \item{x}{list of data matrices, L datasets of explanatory variables.}
@@ -32,6 +33,8 @@ ispls(x, y, L, mu1, mu2, eps = 1e-04, kappa = 0.05,
 \item{scale.y}{character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.}
 
 \item{maxstep}{numeric, maximum iteration steps. The default value is 50.}
+
+\item{submaxstep}{numeric, maximum iteration steps in the sub-iterations. The default value is 10.}
 
 \item{trace}{character, "TRUE" or "FALSE". If TRUE, prints out its screening results of variables.}
 
@@ -70,17 +73,17 @@ res_homo_m <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
 res_homo_s <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
                     eps = 5e-2, kappa = 0.05, pen1 = "homogeneity",
                     pen2 = "sign", scale.x = TRUE, scale.y = TRUE,
-                    maxstep = 50, trace = FALSE, draw = FALSE)
+                    maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 
 res_hete_m <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
                     eps = 5e-2, kappa = 0.05, pen1 = "heterogeneity",
                     pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE,
-                    maxstep = 50, trace = FALSE, draw = FALSE)
+                    maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 
 res_hete_s <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
                     eps = 5e-2, kappa = 0.05, pen1 = "heterogeneity",
                     pen2 = "sign", scale.x = TRUE, scale.y = TRUE,
-                    maxstep = 50, trace = FALSE, draw = FALSE)
+                    maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 }
 }
 \references{
@@ -89,5 +92,5 @@ res_hete_s <- ispls(x = x, y = y, L = L, mu1 = 0.05, mu2 = 0.25,
 }
 }
 \seealso{
-See Also as \code{\link{preview.pls}}, \code{\link{ispca}}, \code{\link{iscca}}.
+See Also as \code{\link{preview.pls}}, \code{\link{ispls.cv}}, \code{\link{meta.spls}}, \code{\link{spls}}.
 }

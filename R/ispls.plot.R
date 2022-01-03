@@ -30,6 +30,7 @@ ispls.plot <- function(x, type) {
   betahat <- x$betahat
   L <- length(betahat)
   p <- nrow(betahat[[1]])
+  q <- ncol(betahat[[1]])
   loading_trace <- x$loading_trace
   iter <- ncol(loading_trace)
 
@@ -49,15 +50,26 @@ ispls.plot <- function(x, type) {
     }
   }
 
-  if(type == "heatmap"){
+  if(type == "heatmap" & q != 1){
     rc <- rainbow(nrow(betahat[[1]]), start = 0, end = .3)
     cc <- rainbow(ncol(betahat[[1]]), start = 0, end = .3)
     for (l in 1:L) {
       heatmap(x = t(betahat[[l]]), RowSideColors = cc, ColSideColors = rc,
-              Rowv = NA, Colv = NA, scale = "row", xlab = paste("Dataset ", l, ": X"), ylab = "Y",
+              Rowv = NA, Colv = NA, scale = "row", xlab = paste("Dataset ", l, ": p"), ylab = "q",
               main = expression(paste("Heatmap of coefficient ", beta[PLS])))
     }
   }
+
+  if(type == "heatmap" & q == 1){
+    betahat_matrix <- matrix(0, ncol = L, nrow = p)
+    for (l in 1:L) { betahat_matrix[, l] <- betahat[[l]] }
+    rc <- rainbow(nrow(betahat_matrix), start = 0, end = .3)
+    cc <- rainbow(ncol(betahat_matrix), start = 0, end = .3)
+    heatmap(x = t(betahat_matrix), RowSideColors = cc, ColSideColors = rc,
+            Rowv = NA, Colv = NA, scale = "row", xlab = paste("p"), ylab = "q",
+            main = expression(paste("Heatmap of coefficient ", beta[PLS])))
+  }
+
 }
 
 

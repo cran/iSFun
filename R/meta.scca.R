@@ -30,7 +30,7 @@
 ##' \itemize{
 ##' \item{Cichonska A, Rousu J, Marttinen P, et al. metaCCA: summary statistics-based multivariate meta-analysis of genome-wide association studies using canonical correlation analysis[J]. Bioinformatics, 2016, 32(13): 1981-1989.}
 ##' }
-##' @seealso See Also as \code{\link{iscca}}.
+##' @seealso See Also as \code{\link{iscca}}, \code{\link{scca}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -56,7 +56,6 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -67,6 +66,7 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
   if(length(p) > 1){ stop("The dimension of data x should be consistent among different datasets.")}
   if(length(q) > 1){ stop("The dimension of data y should be consistent among different datasets.")}
   ip <- c(1:p)
+  iq <- c(1:q)
 
   # center & scale x & y
   meanx <- lapply(1:L, function(l) drop( matrix(1, 1, nl[l]) %*% x[[l]] / nl[l] ) )
@@ -107,7 +107,6 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
     return(r)
   }
 
-  # initilize objects
   fun.1 <- function(l) {
     Z_l <- t(x[[l]]) %*% y[[l]]
   }
@@ -121,17 +120,19 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
 
   u <- U
   v <- V
-  iter <-1
+  iter <- 1
   dis.u <- 10
   dis.v <- 10
 
-  # main iteration: optimize u and v iteratively
   if (trace) {
-    cat("The variables that join the set of selected variables at final step:\n")
+    cat("The variables that join the set of selected variables at each step:\n")
   }
-  while (dis.u > eps & dis.v > eps & iter <= maxstep) {
+
+  while (dis.u > eps & dis.v > eps & iter <= maxstep){
     u.old <- u
     v.old <- v
+
+    u.old <- u
 
     s <- t(v) %*% t(Z) #/ (n)
     ro_d <- mapply(function(j) ro_d1st(s[j], mu1, 6), 1:p)
@@ -143,9 +144,14 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
     u_norm <- sqrt(sum(u^2))
     u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
     u <- u / u_norm
-    if ( sum(abs(u) <= 1e-4 ) == p ) {
-      cat("The value of mu1 is too large");
-      break}
+    dis.u <- sqrt(sum((u - u.old)^2)) / sqrt(sum(u.old^2))
+
+    what <- u
+    what_cut <- ifelse(abs(what) > 1e-4, what, 0)
+    what_cut_norm <- sqrt(sum(what_cut^2))
+    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+    what_dir <- what_cut / what_cut_norm
+    what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
     s <- t(u) %*% Z #/ (n)
     ro_d <- mapply(function(j) ro_d1st(s[j], mu2, 6), 1:q)
@@ -157,19 +163,7 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
     v_norm <- sqrt(sum(v^2))
     v_norm <- ifelse(v_norm == 0, 0.0001, v_norm)
     v <- v / v_norm
-    if ( sum(abs(v) <= 1e-4 ) == q ) {
-      cat("The value of mu2 is too large");
-      break}
-
-    dis.u <- sqrt(sum((u - u.old)^2)) / sqrt(sum(u.old^2))
     dis.v <- sqrt(sum((v - v.old)^2)) / sqrt(sum(v.old^2))
-
-    what <- u
-    what_cut <- ifelse(abs(what) > 1e-4, what, 0)
-    what_cut_norm <- sqrt(sum(what_cut^2))
-    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-    what_dir <- what_cut / what_cut_norm
-    what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
     what_v <- v
     what_cut_v <- ifelse(abs(what_v) > 1e-4, what_v, 0)
@@ -178,53 +172,57 @@ meta.scca <- function(x, y, L, mu1, mu2, eps = 1e-4, scale.x = TRUE, scale.y = T
     what_dir <- what_cut_v / what_cut_norm
     what_cut_v <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
+    dis.u <- sqrt(sum((u - u.old)^2)) / sqrt(sum(u.old^2))
+    dis.v <- sqrt(sum((v - v.old)^2)) / sqrt(sum(v.old^2))
+    if ( sum(abs(v) <= 1e-4 ) == q | sum(abs(u) <= 1e-4 ) == p) { break }
+
+    if (trace) {
+      new2A_u <- ip[what_cut != 0]
+      new2A_v <- iq[what_cut_v != 0]
+      cat("\n")
+      cat(paste("--------------------", "\n"))
+      cat(paste("----- Step", iter, " -----\n", sep = " "))
+      cat(paste("--------------------", "\n"))
+      new2A_l <- new2A_u
+      if (length(new2A_l) <= 10) {
+        cat(paste("X", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("X", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("X", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+
+      new2A_l <- new2A_v
+      if (length(new2A_l) <= 10) {
+        cat(paste("Y", new2A_l, ", ", sep = " "))
+        cat("\n")
+      } else {
+        nlines <- ceiling(length(new2A_l) / 10)
+        for (i in 0:(nlines - 2))
+        {
+          cat(paste("Y", new2A_l[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
+          cat("\n")
+        }
+        cat(paste("Y", new2A_l[(10 * (nlines - 1) + 1):length(new2A_l)], ", ", sep = " "))
+        cat("\n")
+      }
+    }
     iter <- iter + 1
   }
 
   # normalization
-
   what <- what_cut
   what_v <- what_cut_v
 
   # selected variables
-
-  new2A <- which(what != 0)
-  new2A_v <- which(what_v != 0)
-
-  if (trace) {
-    if (length(new2A) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A[(10 * (nlines - 1) + 1):length(new2A)], ", ", sep = " "))
-      cat("\n")
-    }
-
-    if (length(new2A_v) <= 10) {
-      cat(paste("DataSet: \n", sep = ""))
-      cat(paste("X", new2A_v, ", ", sep = " "))
-      cat("\n")
-    } else {
-      cat(paste("DataSet: \n", sep = ""))
-      nlines <- ceiling(length(new2A_v) / 10)
-      for (i in 0:(nlines - 2))
-      {
-        cat(paste("X", new2A_v[(10 * i + 1):(10 * (i + 1))], ", ", sep = " "))
-        cat("\n")
-      }
-      cat(paste("X", new2A_v[(10 * (nlines - 1) + 1):length(new2A_v)], ", ", sep = " "))
-      cat("\n")
-    }
-
-  }
+  new2A <- ip[what != 0]
+  new2A_v <- iq[what_v != 0]
 
   listname <- mapply(function(l) paste("Dataset ", l), 1:L)
   names(meanx) <- listname

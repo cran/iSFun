@@ -11,6 +11,7 @@
 ##' @param pen2 character, "magnitude" or "sign" based contrasted penalty. If not specified, the default is magnitude.
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param maxstep numeric, maximum iteration steps. The default value is 50.
+##' @param submaxstep numeric, maximum iteration steps in the sub-iterations. The default value is 10.
 ##' @param trace character, "TRUE" or "FALSE". If TRUE, prints out its screening results of variables.
 ##' @param draw character, "TRUE" or "FALSE". If TRUE, plot the convergence path of loadings.
 ##'
@@ -28,7 +29,7 @@
 ##' \itemize{
 ##' \item{Fang K, Fan X, Zhang Q, et al. Integrative sparse principal component analysis[J]. Journal of Multivariate Analysis, 2018, 166: 1-16.}
 ##' }
-##' @seealso See Also as \code{\link{preview.pca}}, \code{\link{ispls}}, \code{\link{iscca}}.
+##' @seealso See Also as \code{\link{preview.pca}}, \code{\link{ispca.cv}}, \code{\link{meta.spca}}, \code{\link{spca}}.
 ##'
 ##' @import caret
 ##' @import irlba
@@ -49,23 +50,22 @@
 ##' \donttest{
 ##' res_homo_s <- ispca(x = x, L = L, mu1 = 0.5, mu2 = 0.002,
 ##'                     pen1 = "homogeneity", pen2 = "sign", scale.x = TRUE,
-##'                     maxstep = 50, trace = FALSE, draw = FALSE)
+##'                     maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##'
-##' res_hete_m <- ispca(x = x, L = L, mu1 = 0.2, mu2 = 0.05,
+##' res_hete_m <- ispca(x = x, L = L, mu1 = 0.1, mu2 = 0.05,
 ##'                     pen1 = "heterogeneity", pen2 = "magnitude", scale.x = TRUE,
-##'                     maxstep = 50, trace = FALSE, draw = FALSE)
+##'                     maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##'
-##' res_hete_s <- ispca(x = x, L = L, mu1 = 0.2, mu2 = 0.05,
+##' res_hete_s <- ispca(x = x, L = L, mu1 = 0.1, mu2 = 0.05,
 ##'                     pen1 = "heterogeneity", pen2 = "sign", scale.x = TRUE,
-##'                     maxstep = 50, trace = FALSE, draw = FALSE)
+##'                     maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE)
 ##' }
 
-ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50, trace = FALSE, draw = FALSE) {
+ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, maxstep = 50, submaxstep = 10, trace = FALSE, draw = FALSE) {
 
   if (class(x) != "list") { stop("x should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
   pl <- as.numeric(lapply(x, ncol))
@@ -101,9 +101,8 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
   }
 
   u_value_homo <- function(u, v, p, L, mu1, mu2, pen2) {
-    # compute s[j,l]
     fun.s <- function(j, l) {
-      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol=p, nrow = nl[[l]]) ) / nl[l]
+      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol=p, nrow = nl[l]) ) / nl[l]
       if (pen2 == "magnitude") s2 <- mu2 * sum(u[j, -l])
       if (pen2 == "sign") {
         s2 <- mu2 * sum(mapply(function(x) {
@@ -117,14 +116,11 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute ro'(||c_j||,mu1,a)
-
     norm_u_j <- apply(u, 1, function(x) {
       return(sqrt(sum(x^2)))
     })
     ro_d <- ro_d1st(norm_u_j, mu1, 6)
 
-    # compute c[j,l]
     fun.c <- function(j, l) {
       s_norm <- sqrt(sum(s[j, ]^2))
       if (pen2 == "magnitude") c <- nl[l] * (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 + mu2 * nl[l] * (L - 1) ) * s_norm )
@@ -138,7 +134,6 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
   }
 
   u_value_hetero <- function(u, v, p, L, mu1, mu2, pen2) {
-    # compute mu[j,l]
     fun.mu <- function(j, l) {
       u_j <- u[j, ]
       ro_j <- mapply(ro, abs(u_j), mu1, 6)
@@ -149,10 +144,8 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
     result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
     mu <- matrix(result.mu, nrow = p, ncol = L)
 
-    # compute s[j,l]
-
     fun.s <- function(j, l) {
-      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol=p, nrow = nl[[l]]) ) / nl[l]
+      s1 <- colSums( x[[l]] * matrix(rep(v[[l]], p), ncol=p, nrow = nl[l]) ) / nl[l]
       if (pen2 == "magnitude") s2 <- mu2 * sum(u[j, -l])
       if (pen2 == "sign") {
         s2 <- mu2 * sum(mapply(function(x) {
@@ -165,8 +158,6 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
     }
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
-
-    # compute c[j,l]
 
     fun.c <- function(j, l) {
       if (pen2 == "magnitude") c <- nl[l] * sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 + mu2 *nl[l] * (L - 1) )
@@ -200,39 +191,51 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
     U[, l] <- sgn[l-1]*U[, l]
     V[[l]] <- sgn[l-1]*V[[l]]
   }
+
   u <- U
   v <- V
   iter <-1
-  dis.u <- 10
+  dis.u.iter <- 10
   loading_trace <- matrix(0, nrow = p * L, ncol = maxstep)
 
-  # main iteration
   if (trace) {
     cat("The variables that join the set of selected variables at each step:\n")
   }
-  while (dis.u > eps & iter <= maxstep) {
-    u.old <- u
-    v.old <- v
-    if (pen1 == "homogeneity") u <- u_value_homo(u, v, p, L, mu1, mu2, pen2)
-    if (pen1 == "heterogeneity") u <- u_value_hetero(u, v, p, L, mu1, mu2, pen2)
+
+  while (dis.u.iter > eps & iter <= maxstep) {
+    u.iter <- u
+    subiter_u <- 1
+    dis.u <- 10
+    while (dis.u > eps & subiter_u <= submaxstep) {
+      u.old <- u
+      if (pen1 == "homogeneity") u <- u_value_homo(u, v, p, L, mu1, mu2, pen2)
+      if (pen1 == "heterogeneity") u <- u_value_hetero(u, v, p, L, mu1, mu2, pen2)
+
+      u_norm <- sqrt(colSums(u^2))
+      u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
+      u.scale <- t(t(u) / u_norm)
+      dis.u <- max( sqrt(colSums((u - u.old)^2)) / sqrt(colSums(u.old^2)) )
+
+      what <- u.scale
+      what_cut <- ifelse(abs(what) > 1e-4, what, 0)
+      what_cut_norm <- sqrt(colSums(what_cut^2))
+      what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+      what_dir <- t(t(what_cut) / what_cut_norm)
+      what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
+      loading_trace[, iter] <- as.numeric(what_cut)
+      if (sum(apply(u.scale, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) { break }
+      subiter_u <- subiter_u + 1
+    }
+
     if( sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 ){
-      cat("The value of mu1 is too large");
+      cat("Stop! The value of mu1 is too large");
       what_cut <- u
       break }
+
     v <- lapply(1:L, function(l) x[[l]] %*% u[, l] / sqrt( sum( (x[[l]] %*% u[, l])^2 ) ))
 
-    u_norm <- sqrt(colSums(u^2))
-    u_norm <- ifelse(u_norm == 0, 0.0001, u_norm)
-    u.scale <- t(t(u) / u_norm)
-    dis.u <- max( sqrt(colSums((u - u.old)^2)) / sqrt(colSums(u.old^2)) )
-
-    what <- u.scale
-    what_cut <- ifelse(abs(what) > 1e-4, what, 0)
-    what_cut_norm <- sqrt(colSums(what_cut^2))
-    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-    what_dir <- t(t(what_cut) / what_cut_norm)
-    what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
-    loading_trace[, iter] <- as.numeric(what_cut)
+    dis.u.iter <- max( sqrt(colSums((u - u.iter)^2)) / sqrt(colSums(u.iter^2)) )
+    if (sum(apply(u, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 ) { break }
 
     if (trace) {
       # selected variables
@@ -265,12 +268,9 @@ ispca <- function(x, L, mu1, mu2, eps =1e-4, pen1 = "homogeneity", pen2 = "magni
         }
       }
     }
-
     iter <- iter + 1
-    if (sum(apply(u.scale, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
-      cat("The value of mu1 is too large");
-      break}
   }
+
   loading_trace <- loading_trace[,1:(iter-1)]
 
   # normalization

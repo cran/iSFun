@@ -15,6 +15,7 @@
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param scale.y character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.
 ##' @param maxstep numeric, maximum iteration steps. The default value is 50.
+##' @param submaxstep numeric, maximum iteration steps in the sub-iterations. The default value is 10.
 ##'
 ##' @return An 'ispls.cv' object that contains the list of the following items.
 ##' \itemize{
@@ -55,28 +56,27 @@
 ##'
 ##' res_homo_m <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
 ##'                        kappa = 0.05, pen1 = "homogeneity", pen2 = "magnitude",
-##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 ##'
 ##' res_homo_s <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
 ##'                        kappa = 0.05, pen1 = "homogeneity", pen2 = "sign",
-##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 ##'
 ##' res_hete_m <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
 ##'                        kappa = 0.05, pen1 = "heterogeneity", pen2 = "magnitude",
-##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 ##'
 ##' res_hete_s <- ispls.cv(x = x, y = y, L = L, K = 5, mu1 = mu1, mu2 = mu2, eps = 1e-2,
 ##'                        kappa = 0.05, pen1 = "heterogeneity", pen2 = "sign",
-##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50)
+##'                        scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10)
 ##' }
 
-ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50) {
+ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "homogeneity", pen2 = "magnitude", scale.x = TRUE, scale.y = TRUE, maxstep = 50, submaxstep = 10) {
 
   if (class(x) != "list") { stop("x should be of list type.") }
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -116,10 +116,8 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
   if (scale.x) { x <- lapply(1:L, function(l) scale(x[[l]], FALSE, normx[[l]]) ) }
   if (scale.y) { y <- lapply(1:L, function(l) scale(y[[l]], FALSE, normy[[l]]) ) }
 
-  # initilize objects
   folds <- lapply(1:L, function(l) createFolds(1:nl[l], K))
 
-  # fit direction vector
   ro <- function(x, mu, alpha) {
     f <- function(x) mu * (1 > x / (mu * alpha)) * (1 - x / (mu * alpha))
     r <- integrate(f, 0, x)
@@ -132,7 +130,6 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
   }
 
   c_value_homo <- function(Z, a, c,  p, q, L, mu1, mu2, pen2, nl) {
-    # compute s[j,l]
     fun.s <- function(j, l) {
       Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
       a_l <- matrix(a[, l], ncol = 1)
@@ -151,14 +148,11 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute ro'(||c_j||,mu1,a)
-
     norm_c_j <- apply(c, 1, function(x) {
       return(sqrt(sum(x^2)))
     })
     ro_d <- ro_d1st(norm_c_j, mu1, 6)
 
-    # compute c[j,l]
     fun.c <- function(j, l) {
       s_norm <- sqrt(sum(s[j, ]^2))
       if (pen2 == "magnitude") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 / q / (nl[l]^2) + mu2 * (L - 1) ) * s_norm )
@@ -172,7 +166,6 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
   }
 
   c_value_hetero <- function(Z, a, c, p, q, L, mu1, mu2, pen2, nl) {
-    # compute mu[j,l]
     fun.mu <- function(j, l) {
       c_j <- c[j, ]
       ro_j <- mapply(ro, abs(c_j), mu1, 6)
@@ -182,8 +175,6 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
     }
     result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
     mu <- matrix(result.mu, nrow = p, ncol = L)
-
-    # compute s[j,l]
 
     fun.s <- function(j, l) {
       Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
@@ -203,7 +194,81 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
     result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
     s <- matrix(result.s, nrow = p, ncol = L)
 
-    # compute c[j,l]
+    fun.c <- function(j, l) {
+      if (pen2 == "magnitude") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 / q / (nl[l]^2) + mu2 * (L - 1) )
+
+      if (pen2 == "sign") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 / q / (nl[l]^2) + mu2 * (L - 1) / (c[j, l]^2 + 0.5) )
+
+      return(c)
+    }
+    c <- matrix(mapply(fun.c, rep(c(1:p), times = L), rep(c(1:L), each = p)), nrow = p, ncol = L)
+    return(c)
+  }
+
+  c_value_homo_q1 <- function(Z, a, c,  p, q, L, mu1, mu2, pen2, nl) {
+    fun.s <- function(j, l) {
+      Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
+      a_l <- matrix(a[, l], ncol = 1)
+      c_j <- c[j, ]
+      s1 <- t(a_l) %*% Z_l %*% t(matrix(Z_l[j], nrow = 1)) / (nl[l]^2)
+      if (pen2 == "magnitude") s2 <- mu2 * sum(c_j[-l])
+      if (pen2 == "sign") {
+        s2 <- mu2 * sum(mapply(function(x) {
+          r <- x / sqrt(x^2 + 0.5)
+          return(r)
+        }, c_j[-l])) / sqrt(c_j[l]^2 + 0.5)
+      }
+      s <- s1 + s2
+      return(s)
+    }
+    result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
+    s <- matrix(result.s, nrow = p, ncol = L)
+
+    norm_c_j <- apply(c, 1, function(x) {
+      return(sqrt(sum(x^2)))
+    })
+    ro_d <- ro_d1st(norm_c_j, mu1, 6)
+
+    fun.c <- function(j, l) {
+      s_norm <- sqrt(sum(s[j, ]^2))
+      if (pen2 == "magnitude") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 / q / (nl[l]^2) + mu2 * (L - 1) ) * s_norm )
+
+      if (pen2 == "sign") c <- (s_norm > ro_d[j]) * s[j, l] * (s_norm - ro_d[j]) / ( (1 / q / (nl[l]^2) + mu2 * (L - 1) / (c[j, l]^2 + 0.5) ) * s_norm)
+
+      return(c)
+    }
+    c <- matrix(mapply(fun.c, rep(c(1:p), times = L), rep(c(1:L), each = p)), nrow = p, ncol = L)
+    return(c)
+  }
+
+  c_value_hetero_q1 <- function(Z, a, c, p, q, L, mu1, mu2, pen2, nl) {
+    fun.mu <- function(j, l) {
+      c_j <- c[j, ]
+      ro_j <- mapply(ro, abs(c_j), mu1, 6)
+      s_ro <- sum(as.data.frame(ro_j[1, ]))
+      mu_jl <- ro_d1st(s_ro, 1, 1 / 2 * L * 6 * mu1^2) * ro_d1st(abs(c_j[l]), mu1, 6)
+      return(mu_jl)
+    }
+    result.mu <- mapply(fun.mu, rep(c(1:p), times = L), rep(c(1:L), each = p))
+    mu <- matrix(result.mu, nrow = p, ncol = L)
+
+    fun.s <- function(j, l) {
+      Z_l <- Z[, ((l - 1) * q + 1):(l * q)]
+      a_l <- matrix(a[, l], ncol = 1)
+      c_j <- c[j, ]
+      s1 <- t(a_l) %*% Z_l %*% t(matrix(Z_l[j], nrow = 1)) / (nl[l]^2)
+      if (pen2 == "magnitude") s2 <- mu2 * sum(c_j[-l])
+      if (pen2 == "sign") {
+        s2 <- mu2 * sum(mapply(function(x) {
+          r <- x / sqrt(x^2 + 0.5)
+          return(r)
+        }, c_j[-l])) / sqrt(c_j[l]^2 + 0.5)
+      }
+      s <- s1 + s2
+      return(s)
+    }
+    result.s <- mapply(fun.s, rep(c(1:p), times = L), rep(c(1:L), each = p))
+    s <- matrix(result.s, nrow = p, ncol = L)
 
     fun.c <- function(j, l) {
       if (pen2 == "magnitude") c <- sign(s[j, l]) * (abs(s[j, l]) > mu[j, l]) * (abs(s[j, l]) - mu[j, l]) / ( 1 / q / (nl[l]^2) + mu2 * (L - 1) )
@@ -226,6 +291,7 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
     return(list(x.train = x.train, y.train = y.train, x.test = x.test,
                 y.test = y.test, nl.train = nl.train, nl.test = nl.test))
   }
+
   data.cv = lapply(1:K, fun.k)
 
   cv.fun <- function(k){
@@ -238,13 +304,10 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
 
     what <- matrix(0, p, L)
 
-    # define Z
-
     fun.1 <- function(l) {
       Z_l <- t(x.train[[l]]) %*% y.train[[l]]
       Z_l <- Z_l / nl.train[l]
     }
-    #ZZ <- lapply(1:L, fun.1)
     Z <- matrix(mapply(fun.1, c(1:L)), nrow = p)
 
     fun.2 <- function(l) M_l <- Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)]) / q # / (nl.train[l]^2)
@@ -253,17 +316,22 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
     iter  <- 1
 
     # main iteration: optimize c and a iteratively
-
     kappa2 <- (1 - kappa) / (1 - 2 * kappa)
 
     # initial value for c(l) (outside the unit circle)
-
-    c <- mapply(function(l) svd(Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)]), nu = 1)$u, 1:L)
+    c <- mapply(function(l) svd(Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)] ), nu = 1)$u, 1:L)
+    sgn1 <- mapply(function(l) sign( t(c[, l]) %*% Z[, ((l - 1) * q + 1):(l * q)] %*% t(Z[, ((l - 1) * q + 1):(l * q)] ) %*% c[, l]), 1:L )
+    for (l in 1:L) { c[, l] <- sgn1[l]*c[, l]}
+    sgn2 <- mapply(function(l) sign((c[, 1] %*% c[,l])/(sqrt(sum(c[, 1]^2))*sqrt(sum(c[, l]^2)))), 2:L )
+    for (l in 2:L) { c[, l] <- sgn2[l-1] * c[, l] }
     a <- c
+    dis.c.iter <- 10
+    loading_trace <- matrix(0, nrow = p * L, ncol = maxstep)
 
-    while (dis > eps & iter <= maxstep) {
+    while (dis.c.iter > eps & iter <= maxstep) {
       # optimize a(l) for fixed c(l)
-      c.old <- c
+      c.iter <- c
+      a.iter <- a
       fun.3 <- function(l) {
         h <- function(lambda) {
           alpha <- solve(M[, ((l - 1) * p + 1):(l * p)] + lambda * diag(p)) %*% M[, ((l - 1) * p + 1):(l * p)] %*% c[, l]
@@ -272,7 +340,6 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
         }
 
         # control size of M_l & c_l if too small
-
         while (h(1e-4) * h(1e+12) > 0) { # while( h(1e-4) <= 1e+5 )
           {
             M[, ((l - 1) * p + 1):(l * p)] <- 2 * M[, ((l - 1) * p + 1):(l * p)]
@@ -281,7 +348,6 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
         }
 
         # optimization
-
         lambdas <- uniroot(h, c(1e-4, 1e+12))$root
         a_l <- kappa2 * solve(M[, ((l - 1) * p + 1):(l * p)] + lambdas * diag(p)) %*% M[, ((l - 1) * p + 1):(l * p)] %*% c[, l]
         return(a_l)
@@ -290,35 +356,60 @@ ispls.cv <- function(x, y, L, K, mu1, mu2, eps = 1e-4, kappa = 0.05, pen1 = "hom
       a <- mapply(fun.3, c(1:L))
 
       # optimize c(l) for fixed a(l)
+      subiter_c <- 1
+      dis.c <- 10
+      while (dis.c > eps & subiter_c <= submaxstep) {
+        c.old <- c
+        if (pen1 == "homogeneity" & q != 1) c <- c_value_homo(Z, a, c, p, q, L, mu1, mu2, pen2, nl = nl.train)
+        if (pen1 == "homogeneity" & q == 1) c <- c_value_homo_q1(Z, a, c, p, q, L, mu1, mu2, pen2, nl = nl.train)
+        if (pen1 == "heterogeneity" & q != 1) c <- c_value_hetero(Z, a, c, p, q, L, mu1, mu2, pen2, nl = nl.train)
+        if (pen1 == "heterogeneity" & q == 1) c <- c_value_hetero_q1(Z, a, c, p, q, L, mu1, mu2, pen2, nl = nl.train)
 
-      if (pen1 == "homogeneity") c <- c_value_homo(Z, a, c, p, q, L, mu1, mu2, pen2, nl = nl.train)
-      if (pen1 == "heterogeneity") c <- c_value_hetero(Z, a, c, p, q, L, mu1, mu2, pen2, nl = nl.train)
+        # calculate discrepancy between a & c
+        c_norm <- sqrt(colSums(c^2))
+        c_norm <- ifelse(c_norm == 0, 0.0001, c_norm)
+        c <- t(t(c) / c_norm)
+        dis <- max( sqrt(colSums((c - c.old)^2)) / sqrt(colSums(c.old^2)) )
 
-      # calculate discrepancy between a & c
-      c_norm <- sqrt(colSums(c^2))
-      c_norm <- ifelse(c_norm == 0, 0.0001, c_norm)
-      c <- t(t(c) / c_norm)
-      #dis <- max(abs(c - c.old))
-      dis <- max( sqrt(colSums((c - c.old)^2)) / sqrt(colSums(c.old^2)) )
+        what <- c
+        what_cut <- ifelse(abs(what) > 1e-4, what, 0)
+        what_cut_norm <- sqrt(colSums(what_cut^2))
+        what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
+        what_dir <- t(t(what_cut) / what_cut_norm)
+        what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
+        if (sum(apply(c, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
+          cat("The value of mu1 is too large");
+          break}
+        subiter_c <- subiter_c + 1
+      }
+
+      dis.c.iter <- max( sqrt(colSums((c - c.iter)^2)) / sqrt(colSums(c.iter^2)) )
+      if (sum(apply(c, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0 ) { break }
       iter <- iter + 1
-      if (sum(apply(c, 2, function(x) sum(abs(x) <= 1e-4) == p)) > 0) {
-        cat("The value of mu1 is too large");
-        break} # exists an l such that c(l)=0
     }
-    what <- c
-    what_cut <- ifelse(abs(what) > 1e-4, what, 0)
-    what_cut_norm <- sqrt(colSums(what_cut^2))
-    what_cut_norm <- ifelse(what_cut_norm == 0, 0.0001, what_cut_norm)
-    what_dir <- t(t(what_cut) / what_cut_norm)
-    what_cut <- ifelse(abs(what_dir) > 1e-4, what_dir, 0)
 
-    fun.1 <- function(l) {
-      Z_l <- ( t(x.test[[l]]) %*% y.test[[l]] ) / nl.test[l]
-      rho <- t(what_cut[, l]) %*% Z_l %*% t(Z_l) %*% what_cut[, l]
-      return(rho)
+    fun.fit.cv <- function(l) {
+      x_l <- x.train[[l]]
+      w_l <- as.matrix(what_cut[, l], ncol = 1)
+      t_l <- x_l %*% w_l
+
+      if (sum(w_l == 0) != p) {
+        y_l <- y.train[[l]]
+        fit_l <- lm(y_l ~ t_l - 1)
+        betahat_l <- matrix(w_l %*% coef(fit_l), nrow = p, ncol = q)
+      }
+      else {
+        betahat_l <- matrix(0, nrow = p, ncol = q)
+      }
+      return(betahat_l)
     }
-    cv.rho <- sum( as.numeric( lapply(1:L, fun.1) ) )
+    betahat.cv <- lapply(1:L, fun.fit.cv)
+
+    get_rho <- function(l){
+      norm(y.test[[l]] - x.test[[l]]%*%betahat.cv[[l]], "F")^2
+    }
+    cv.rho <- sum( mapply(get_rho, 1:L) )
     return(cv.rho)
   }
 

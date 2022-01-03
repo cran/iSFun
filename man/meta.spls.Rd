@@ -55,5 +55,5 @@ L <- length(x)
 res <- meta.spls(x = x, y = y, L = L, mu1 = 0.03, trace = TRUE)
 }
 \seealso{
-See Also as \code{\link{ispls}}.
+See Also as \code{\link{ispls}}, \code{\link{spls}}.
 }

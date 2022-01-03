@@ -18,7 +18,7 @@ preview.cca(x, y, L, scale.x = TRUE, scale.y = TRUE)
 \item{scale.y}{character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.}
 }
 \value{
-An 'iscca' object that contains the list of the following items.
+An 'preview.cca' object that contains the list of the following items.
 \itemize{
 \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 \item{y:}{ list of data matrices, L datasets of dependent variables with centered columns. If scale.y is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
@@ -31,7 +31,7 @@ An 'iscca' object that contains the list of the following items.
 }
 }
 \description{
-The function describes the basic statistical information of the data, including sample mean, sample co-variance of X and Y, and the first pair of canonical vector.
+The function describes the basic statistical information of the data, including sample mean, sample variance of X and Y, and the first pair of canonical vectors.
 }
 \examples{
 # Load a list with 3 data sets

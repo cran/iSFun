@@ -12,7 +12,7 @@ ispca.plot(x, type)
 \item{type}{character, "path" or "loading" type, if "path", plot the the convergence path graph of the first eigenvector u in the integrative sparse principal component analysis method, if "loading", plot the first eigenvector.}
 }
 \value{
-show the first eigenvector u.
+the convergence path graph or the scatter diagrams of the first eigenvector u.
 }
 \description{
 Plot the convergence path graph or estimated value of the first eigenvector u in the integrative sparse principal component analysis method.

@@ -1,6 +1,6 @@
 ##' @title Statistical description before using function iscca
 ##'
-##' @description The function describes the basic statistical information of the data, including sample mean, sample co-variance of X and Y, and the first pair of canonical vector.
+##' @description The function describes the basic statistical information of the data, including sample mean, sample variance of X and Y, and the first pair of canonical vectors.
 ##'
 ##' @param x list of data matrices, L datasets of explanatory variables.
 ##' @param y list of data matrices, L datasets of dependent variables.
@@ -8,7 +8,7 @@
 ##' @param scale.x character, "TRUE" or "FALSE", whether or not to scale the variables x. The default is TRUE.
 ##' @param scale.y character, "TRUE" or "FALSE", whether or not to scale the variables y. The default is TRUE.
 ##'
-##' @return An 'iscca' object that contains the list of the following items.
+##' @return An 'preview.cca' object that contains the list of the following items.
 ##' \itemize{
 ##' \item{x:}{ list of data matrices, L datasets of explanatory variables with centered columns. If scale.x is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
 ##' \item{y:}{ list of data matrices, L datasets of dependent variables with centered columns. If scale.y is TRUE, the columns of L datasets are standardized to have mean 0 and standard deviation 1.}
@@ -45,7 +45,6 @@ preview.cca <- function(x, y, L, scale.x = TRUE, scale.y = TRUE) {
   if (class(y) != "list") { stop("y should be of list type.") }
 
   # initialization
-
   x  <- lapply(x, as.matrix)
   y  <- lapply(y, as.matrix)
   nl <- as.numeric(lapply(x, nrow))
@@ -130,16 +129,6 @@ preview.cca <- function(x, y, L, scale.x = TRUE, scale.y = TRUE) {
   }
 
   plot_loading(order = 1:L)
-
-  heat <- lapply(1:L, function(l) t(x[[l]]) %*% y[[l]] )
-
-  rc <- rainbow(nrow(heat[[1]]), start = 0, end = .3)
-  cc <- rainbow(ncol(heat[[1]]), start = 0, end = .3)
-  for (l in 1:L) {
-    heatmap(x = t(heat[[l]]), RowSideColors = cc, ColSideColors = rc,
-            Rowv = NA, Colv = NA, scale = "row", xlab = paste("Dataset ", l, ": X"), ylab = "Y",
-            main = paste("Heatmap of co-variance (X vs. Y)"))
-  }
 
   # return objects
   object <- list(
